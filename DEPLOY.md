@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="icon.png" alt="Gundam News Bot" width="200"/>
+  <img src="assets/icon.png" alt="Game News &amp; Trailers Bot" width="200"/>
 </p>
 
 <h1 align="center">🐳 Guia de Deploy — Mafty Intelligence System</h1>

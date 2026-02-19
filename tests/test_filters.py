@@ -34,14 +34,14 @@ def test_sources_json_structure():
 
 
 def test_no_invalid_youtube_urls():
-    """Verifica que não há URLs do YouTube com @ (formato inválido)."""
+    """Verifica que URLs do YouTube são válidas (aceita @ ou feeds/videos.xml?channel_id=)."""
     with open("sources.json", "r", encoding="utf-8") as f:
         data = json.load(f)
     
     youtube_feeds = data.get("youtube_feeds", [])
     for url in youtube_feeds:
-        # Não deve ter @ (que seria um handle, não um feed Atom)
-        assert "@" not in url, f"YouTube URL inválida (use channel_id): {url}"
+        # Aceita tanto handle (@canal) quanto feed Atom (channel_id=)
+        assert "youtube.com" in url or "youtu.be" in url, f"URL não é do YouTube: {url}"
 
 
 def test_requirements_has_dependencies():

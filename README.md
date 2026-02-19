@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/icon.png" alt="Game News &amp; Trailers Bot" width="120"/>
+</p>
+
 # 🎮 Game News & Trailers Bot
 
 Bot de Discord para **notícias e trailers de jogos**. Monitora lançamentos, DLCs, trailers no YouTube e novidades de jogos AAA, com filtros por plataforma e qualidade.
