@@ -9,7 +9,7 @@ from deep_translator import GoogleTranslator
 
 from utils.storage import p, load_json_safe
 
-log = logging.getLogger("MaftyIntel")
+log = logging.getLogger("GameBot")
 
 
 class Translator:

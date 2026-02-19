@@ -1,4 +1,7 @@
-
+"""
+Legacy script: example for adding URLs to sources.json.
+Current game feeds are in sources.json. This file kept for reference.
+"""
 import json
 import asyncio
 import httpx
@@ -9,29 +12,17 @@ from urllib.parse import urlparse, parse_qs
 SOURCES_FILE = "sources.json"
 NEW_URLS = [
     "https://p-bandai.com/us/",
-    "https://en.gundam-official.com/news/jy757u7j45nlih4nip2rzfxn",
+    "https://blog.playstation.com/feed/",
     "https://www.bandainamcoent.com/",
     "https://store.bandainamcoent.com/",
-    "https://en.gundam-official.com/",
-    "https://en.gundam-official.com/news",
-    "https://en.gundam.info/content/special-collaboration/#",
-    "https://www.youtube.com/@GundamInfo",
-    "https://www.bandainamco.co.jp/en/gundam-next-future-pavilion/index.php",
-    "https://www.bandainamco.co.jp/en/gundam-next-future-pavilion/withfans/index.php",
-    "https://www.youtube.com/c/GUNDAM",
-    "https://x.com/GUNDAMPAVILION",
-    "https://global.bandai-hobby.net/es/series/gundam/",
+    "https://news.xbox.com/en-us/feed/",
+    "https://store.steampowered.com/feeds/news.xml",
+    "https://www.rockpapershotgun.com/feed",
+    "https://www.polygon.com/rss/index.xml",
+    "https://www.youtube.com/@IGN",
+    "https://www.youtube.com/@PlayStation",
+    "https://www.youtube.com/@Xbox",
     "https://global.bandai-hobby.net/es/",
-    "https://en.gundam-official.com/series",
-    "https://gundam-uce.ggame.jp/en/",
-    "https://www.gundam-ab.com/",
-    "http://gundam-ab.com/news/",
-    "https://www.gundam-base.net/",
-    "https://www.gundamplanet.com/",
-    "https://www.gundam-zz.net/",
-    "https://gundam.fandom.com/wiki/Mobile_Suit_Gundam",
-    "https://www.instagram.com/mobilesuitgundam_oficial/",
-    "https://en.gundam.info/about-gundam/series-pages/buildmetaverse/",
     "https://www.strict-g.com/",
     "https://p-bandai.jp/global_newpc.html"
 ]

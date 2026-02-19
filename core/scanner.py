@@ -27,7 +27,7 @@ from core.stats import stats
 from core.filters import match_intel
 from core.html_monitor import check_official_sites
 
-log = logging.getLogger("MaftyIntel")
+log = logging.getLogger("GameBot")
 
 # Lock global para impedir varreduras simultâneas
 scan_lock = asyncio.Lock()
@@ -416,7 +416,7 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                             log.debug(f"Erro ao verificar domínio de mídia para '{link[:50]}...': {e}")
 
                         try:
-                            # Sempre usa Embed para manter a identidade INTEL MAFTY
+                            # Embed para notícias
                             embed = discord.Embed(
                                 title=t_translated[:256],
                                 description=s_translated,
@@ -515,7 +515,7 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                             continue
 
                         if channel:
-                            await channel.send(f"⚠️ **MAFTY INTEL ALERT**\n{u_title}\n{u_link}")
+                            await channel.send(f"⚠️ **GameBot — Alerta**\n{u_title}\n{u_link}")
                             sent_count += 1
             else:
                  if new_hashes != html_hashes:

@@ -8,7 +8,7 @@ import shutil
 from datetime import datetime
 from typing import Any, Dict, Tuple, Optional
 
-log = logging.getLogger("MaftyIntel")
+log = logging.getLogger("GameBot")
 
 
 def p(filename: str) -> str:

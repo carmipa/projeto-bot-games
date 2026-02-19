@@ -9,7 +9,7 @@ import logging
 from bot.views.filter_dashboard import FilterDashboard
 from utils.storage import p, load_json_safe, save_json_safe
 
-log = logging.getLogger("MaftyIntel")
+log = logging.getLogger("GameBot")
 
 
 class DashboardCog(commands.Cog):
@@ -19,11 +19,11 @@ class DashboardCog(commands.Cog):
         self.bot = bot
         self.run_scan_once = run_scan_once_func
     
-    @app_commands.command(name="dashboard", description="Abre o painel Mafty.")
+    @app_commands.command(name="dashboard", description="Abre o painel de filtros do bot.")
     @app_commands.checks.has_permissions(administrator=True)
     async def dashboard(self, interaction: discord.Interaction):
         """
-        Abre o painel Mafty e configura o canal atual.
+        Abre o painel de filtros e configura o canal atual.
         Em seguida, dispara uma varredura imediata.
         """
         # Defer pois vai fazer varredura
@@ -58,7 +58,7 @@ class DashboardCog(commands.Cog):
         
         # Envia painel no canal
         msg = await interaction.channel.send(
-            "🛰️ **MAFTY INTELLIGENCE DASHBOARD**\n"
+            "🎮 **GameBot — Painel**\n"
             "Configure os filtros de notícias abaixo:",
             view=view
         )
@@ -77,7 +77,7 @@ class DashboardCog(commands.Cog):
     @app_commands.checks.has_permissions(administrator=True)
     async def set_canal(self, interaction: discord.Interaction, canal: discord.TextChannel = None):
         """
-        Define o canal onde o bot enviará notícias de Gundam.
+        Define o canal onde o bot enviará notícias de jogos.
         Se nenhum canal for especificado, usa o canal atual.
         """
         # Tenta fazer defer, mas trata se a interação já expirou

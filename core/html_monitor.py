@@ -1,5 +1,5 @@
 """
-HTML Monitor - Detects changes in static websites (Official Gundam Sites).
+HTML Monitor - Detects changes in static websites (e.g. game news sites).
 """
 import ssl
 import logging
@@ -14,7 +14,7 @@ from bs4 import BeautifulSoup
 from utils.storage import p, load_json_safe, save_json_safe
 from utils.security import validate_url
 
-log = logging.getLogger("MaftyIntel")
+log = logging.getLogger("GameBot")
 
 # Tags to ignore during hash calculation (noise reduction)
 IGNORE_TAGS = ['script', 'style', 'meta', 'noscript', 'iframe', 'svg']

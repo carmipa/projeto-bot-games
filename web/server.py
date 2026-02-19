@@ -14,7 +14,7 @@ from core.stats import stats
 from utils.storage import p
 from settings import LOG_LEVEL
 
-log = logging.getLogger("MaftyWeb")
+log = logging.getLogger("GameNewsWeb")
 
 # Configuração de segurança
 WEB_AUTH_TOKEN = os.getenv("WEB_AUTH_TOKEN", None)

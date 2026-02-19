@@ -86,7 +86,7 @@ class ColorfulFormatter(logging.Formatter):
         
         return "\n".join(colored_lines)
 
-def setup_logger(name="MaftyIntel", log_file="logs/bot.log", level=logging.INFO):
+def setup_logger(name="GameBot", log_file="logs/bot.log", level=logging.INFO):
     """
     Configura e retorna um logger com handlers de arquivo (rotativo) e console (colorido).
     """

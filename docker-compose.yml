@@ -1,7 +1,7 @@
 services:
-  gundam-bot:
+  bot:
     build: .
-    container_name: gundam-news-bot
+    container_name: projeto-bot-games
     restart: unless-stopped
     tty: true
     stdin_open: true
@@ -38,5 +38,5 @@ services:
 
     # Labels para organização
     labels:
-      com.gundam-bot.description: "Mafty Intelligence System"
-      com.gundam-bot.version: "2.1"
+      com.projeto-bot-games.description: "GameBot"
+      com.projeto-bot-games.version: "2.1"

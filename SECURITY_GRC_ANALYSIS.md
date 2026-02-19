@@ -1,13 +1,13 @@
-# 🔒 Análise de Segurança e GRC - Gundam News Discord Bot
+# 🔒 Análise de Segurança e GRC - GameBot (Discord)
 
 **Data da Análise:** 13 de Fevereiro de 2026  
-**Versão do Bot:** 2.1 "Mafty Sovereign"
+**Versão do Bot:** 2.1 "v2.1"
 
 ---
 
 ## 📋 Sumário Executivo
 
-Este documento apresenta uma análise completa de segurança e GRC (Governança, Riscos e Compliance) do bot Discord Gundam News. O bot está funcionalmente correto, mas apresenta várias oportunidades de melhoria em segurança e conformidade.
+Este documento apresenta uma análise completa de segurança e GRC (Governança, Riscos e Compliance) do GameBot. O bot está funcionalmente correto, mas apresenta várias oportunidades de melhoria em segurança e conformidade.
 
 **Status Geral:** ⚠️ **Bom, mas com melhorias necessárias**
 

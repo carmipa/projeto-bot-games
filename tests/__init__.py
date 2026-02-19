@@ -1,1 +1,1 @@
-# Testes para o Gundam News Bot
+# Testes para o GameBot

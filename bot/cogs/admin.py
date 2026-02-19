@@ -10,7 +10,7 @@ from datetime import datetime
 
 from utils.storage import p, load_json_safe, save_json_safe, create_backup, get_state_stats, clean_state
 
-log = logging.getLogger("MaftyIntel")
+log = logging.getLogger("GameBot")
 
 
 class AdminCog(commands.Cog):

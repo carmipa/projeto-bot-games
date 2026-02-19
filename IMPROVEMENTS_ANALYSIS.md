@@ -1,7 +1,7 @@
-# 🔍 Análise Completa de Melhorias - Gundam News Bot
+# 🔍 Análise Completa de Melhorias - GameBot
 
 **Data da Análise:** 13 de Fevereiro de 2026  
-**Versão Atual:** 2.1 "Mafty Sovereign"  
+**Versão Atual:** 2.1 "v2.1"  
 **Status:** ✅ Bot funcional e estável
 
 ---

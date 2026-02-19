@@ -4,10 +4,10 @@ from core.filters import _contains_any
 
 def test_contains_any_basic_match():
     """Test verification of basic keyword matches."""
-    keywords = ["gundam", "zaku"]
-    assert _contains_any("i love gundam", keywords) is True
-    assert _contains_any("zaku is cool", keywords) is True
-    assert _contains_any("no robots here", keywords) is False
+    keywords = ["game", "steam"]
+    assert _contains_any("i love game news", keywords) is True
+    assert _contains_any("steam release", keywords) is True
+    assert _contains_any("no games here", keywords) is False
 
 def test_contains_any_word_boundaries():
     """Test that it respects word boundaries (no partial matches)."""
@@ -19,17 +19,15 @@ def test_contains_any_word_boundaries():
     assert _contains_any("swinging", keywords) is False
     
     # Should MATCH
-    assert _contains_any("gundam wing zero", keywords) is True
-    assert _contains_any("gundam seed destiny", keywords) is True
+    assert _contains_any("game wing zero", keywords) is True
+    assert _contains_any("game seed destiny", keywords) is True
 
 def test_contains_any_plurals():
     """Test that regular plural check works (optional 's')."""
-    # Note: The implementation plan decided to allow optional 's'
-    # Implementation should handle: r'\bkeyword(?:s)?\b'
-    keywords = ["gundam", "zaku", "wing"]
+    keywords = ["game", "steam", "wing"]
     
-    assert _contains_any("look at those gundams", keywords) is True
-    assert _contains_any("lots of zakus", keywords) is True
+    assert _contains_any("look at those games", keywords) is True
+    assert _contains_any("steam games", keywords) is True
     assert _contains_any("broken wings", keywords) is True
 
 def test_contains_any_00_edge_case():
@@ -43,14 +41,14 @@ def test_contains_any_00_edge_case():
     assert _contains_any("2000", keywords) is False
     
     # Should MATCH standalone 00
-    assert _contains_any("gundam 00 is great", keywords) is True
+    assert _contains_any("game 00 is great", keywords) is True
     assert _contains_any("double 00", keywords) is True
 
 def test_contains_any_char_edge_case():
     """Test 'char' vs 'charge'."""
     keywords = ["char"]
     
-    assert _contains_any("char aznable", keywords) is True
+    assert _contains_any("char name", keywords) is True
     assert _contains_any("charge your phone", keywords) is False
-    assert _contains_any("char's counterattack", keywords) is True
+    assert _contains_any("char's model", keywords) is True
 

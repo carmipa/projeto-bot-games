@@ -1,6 +1,6 @@
-# 📚 Referência Completa de Comandos - Gundam News Bot
+# 📚 Referência Completa de Comandos - GameBot
 
-**Versão:** 2.1 "Mafty Sovereign"  
+**Versão:** 2.1 "v2.1"  
 **Última Atualização:** 13 de Fevereiro de 2026
 
 ---
@@ -19,7 +19,7 @@
 
 ### `/set_canal`
 
-**Descrição:** Define o canal onde o bot enviará notícias de Gundam.
+**Descrição:** Define o canal onde o bot enviará notícias de jogos.
 
 **Sintaxe:**
 ```
@@ -68,7 +68,7 @@
 - 🌟 **TUDO** - Liga/desliga todas as categorias
 - 🤖 **Gunpla** - Kits, P-Bandai, Ver.Ka
 - 🎬 **Filmes** - Anime, trailers, séries
-- 🎮 **Games** - Jogos Gundam
+- 🎮 **Games** - Jogos
 - 🎵 **Música** - OST, álbuns
 - 👕 **Fashion** - Roupas e merchandise
 - 🌐 **Idioma** - Seleção de idioma
@@ -412,4 +412,4 @@ HTML: 8          HTML: 8
 ---
 
 **Última Atualização:** 13 de Fevereiro de 2026  
-**Versão do Bot:** 2.1 "Mafty Sovereign"
+**Versão do Bot:** 2.1 "v2.1"

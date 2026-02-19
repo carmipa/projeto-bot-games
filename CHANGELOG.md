@@ -1,4 +1,4 @@
-# 📝 Changelog - Gundam News Bot
+# 📝 Changelog - GameBot
 
 Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 

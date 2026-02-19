@@ -1,6 +1,6 @@
-# 🎮 Tutorial de Comandos - Gundam News Bot
+# 🎮 Tutorial de Comandos - GameBot
 
-Este guia explica como utilizar todos os comandos disponíveis no **Mafty Intelligence System**.
+Este guia explica como utilizar todos os comandos disponíveis no **GameBot**.
 
 ---
 
@@ -117,7 +117,7 @@ Testa a velocidade de resposta do bot em milissegundos.
     O bot possui um player nativo! Links do YouTube e Twitch postados por ele podem ser assistidos diretamente dentro do Discord, sem abrir o navegador.
 
 2. **Filtros Inteligentes:**
-    O bot usa um sistema de "camadas". Se você notar que notícias gerais de anime (como One Piece) não aparecem, é porque o filtro **Anti-Spam** está funcionando corretamente, focando apenas no universo Gundam.
+    O bot usa um sistema de "camadas". Se você notar que notícias gerais de anime (como One Piece) não aparecem, é porque o filtro **Anti-Spam** está funcionando corretamente, focando apenas no notícias de jogos.
 
 3. **Monitoramento Oficial:**
-    Além de RSS, o bot "olha" visualmente sites oficiais (como o Gundam.info ou Bandai Hobby) para detectar novidades que não aparecem em feeds comuns.
+    Além de RSS, o bot "olha" visualmente sites oficiais (como o sites de jogos) para detectar novidades que não aparecem em feeds comuns.

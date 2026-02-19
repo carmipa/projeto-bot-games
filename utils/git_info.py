@@ -1,7 +1,7 @@
 import subprocess
 import logging
 
-log = logging.getLogger("MaftyIntel")
+log = logging.getLogger("GameBot")
 
 def get_git_changes():
     """

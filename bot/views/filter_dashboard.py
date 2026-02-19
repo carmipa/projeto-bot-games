@@ -8,12 +8,12 @@ import logging
 from core.filters import FILTER_OPTIONS
 from utils.storage import p, load_json_safe, save_json_safe
 
-log = logging.getLogger("MaftyIntel")
+log = logging.getLogger("GameBot")
 
 
 class FilterDashboard(discord.ui.View):
     """
-    Painel persistente de filtros Mafty.
+    Painel persistente de filtros do GameBot.
     Botões por categoria + botão de 'Ver filtros' + Reset.
     """
     
@@ -88,7 +88,7 @@ class FilterDashboard(discord.ui.View):
                 label=label,
                 emoji=emoji,
                 style=style,
-                custom_id=f"mafty:filter:{self.guild_id}:{key}",
+                custom_id=f"gamesbot:filter:{self.guild_id}:{key}",
                 row=0 if list(FILTER_OPTIONS.keys()).index(key) < 5 else 1 # Tenta organizar em linhas
             )
             btn.callback = self._toggle_callback
@@ -109,7 +109,7 @@ class FilterDashboard(discord.ui.View):
             btn = discord.ui.Button(
                 emoji=flag,
                 style=style,
-                custom_id=f"mafty:lang:{self.guild_id}:{code}",
+                custom_id=f"gamesbot:lang:{self.guild_id}:{code}",
                 row=2 
             )
             btn.callback = self._lang_callback
@@ -120,7 +120,7 @@ class FilterDashboard(discord.ui.View):
             label="Ver filtros",
             emoji="📌",
             style=discord.ButtonStyle.secondary,
-            custom_id=f"mafty:show:{self.guild_id}",
+            custom_id=f"gamesbot:show:{self.guild_id}",
             row=3
         )
         show_btn.callback = self._show_callback
@@ -130,7 +130,7 @@ class FilterDashboard(discord.ui.View):
             label="Reset",
             emoji="🔄",
             style=discord.ButtonStyle.danger,
-            custom_id=f"mafty:reset:{self.guild_id}",
+            custom_id=f"gamesbot:reset:{self.guild_id}",
             row=3
         )
         reset_btn.callback = self._reset_callback
@@ -145,8 +145,9 @@ class FilterDashboard(discord.ui.View):
             )
             return
         
-        # Extrai categoria do custom_id: "mafty:filter:123456:gunpla"
-        parts = interaction.data.get("custom_id", "").split(":")
+        # Extrai categoria do custom_id: "gamesbot:filter:123456:gunpla" (aceita também "mafty:" por compat.)
+        raw_id = interaction.data.get("custom_id", "")
+        parts = raw_id.split(":")
         if len(parts) < 4:
             await interaction.response.send_message("❌ Erro ao processar.", ephemeral=True)
             return

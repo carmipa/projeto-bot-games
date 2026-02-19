@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from core.stats import stats
 from settings import LOOP_MINUTES
 
-log = logging.getLogger("MaftyIntel")
+log = logging.getLogger("GameBot")
 
 
 
@@ -46,7 +46,7 @@ class StatusCog(commands.Cog):
         self.bot = bot
         self.run_scan_once = run_scan_once_func
     
-    @app_commands.command(name="status", description="Mostra estatísticas do bot Mafty.")
+    @app_commands.command(name="status", description="Mostra estatísticas do bot.")
     async def status(self, interaction: discord.Interaction):
         """Exibe estatísticas e status atual do bot."""
         await interaction.response.defer(ephemeral=True) # Fix timeout
@@ -56,7 +56,7 @@ class StatusCog(commands.Cog):
         next_scan_ts = int(next_scan.timestamp())
         
         embed = discord.Embed(
-            title="🛰️ Status do Mafty Intel Bot",
+            title="🎮 Status do GameBot",
             color=discord.Color.from_rgb(255, 0, 32),
             timestamp=datetime.now()
         )

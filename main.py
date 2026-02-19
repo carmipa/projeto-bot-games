@@ -1,5 +1,5 @@
 # =========================================================
-# Gundam Intel Bot - "Mafty Sovereign" v2.1
+# GameBot v2.1
 # main.py (Modularized)
 # =========================================================
 
@@ -20,7 +20,7 @@ from utils.storage import save_json_safe
 from utils.logger import setup_logger
 
 # Configura o logger global com rotação de arquivos e cores no console
-log = setup_logger(name="MaftyIntel", log_file="logs/bot.log", level=LOG_LEVEL)
+log = setup_logger(name="GameBot", log_file="logs/bot.log", level=LOG_LEVEL)
 
 
 # =========================================================
@@ -122,14 +122,13 @@ async def main():
                 if target_channel:
                     log.info(f"📢 Anunciando nova versão {current_hash} no canal {target_channel.name}")
                     
-                    # Mafty System Style Embed
                     from datetime import datetime
                     now = datetime.now()
                     date_str = now.strftime("%Y.%m.%d")
                     time_str = now.strftime("%H:%M")
                     
                     embed = discord.Embed(
-                        title=f"🛰️ MAFTY SYSTEM UPDATE - RELEASE DAY {date_str}",
+                        title=f"🎮 GameBot — Atualização {date_str}",
                         description=f"{changes}",
                         color=discord.Color.from_rgb(255, 100, 0) # Orange/Red theme
                     )

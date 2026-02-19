@@ -1,11 +1,11 @@
 {
     "bot": {
-        "name": "Sistema de Inteligencia Mafty",
-        "description": "Bot de Noticias Gundam"
+        "name": "GameBot",
+        "description": "Bot de Noticias de Juegos"
     },
     "commands": {
         "help": {
-            "title": "📖 Manual de Operaciones - Mafty Intel",
+            "title": "📖 Manual de Operaciones - GameBot",
             "config": "🛠️ Configuración (Admin)",
             "dashboard": "**/dashboard** - Panel visual para configurar filtros",
             "forcecheck": "**/forcecheck** - Fuerza un escaneo inmediato",
@@ -19,7 +19,7 @@
             "response": "🏓 **Pong!** Latencia: `{latency}ms`"
         },
         "about": {
-            "description": "Bot especializado en monitoreo de noticias Gundam.\nRecopila información de RSS, YouTube y sitios oficiales, traduce a su idioma y publica en canales configurados.",
+            "description": "Bot especializado en monitoreo de noticias de juegos.\nRecopila información de RSS, YouTube y sitios oficiales, traduce a su idioma y publica en canales configurados.",
             "developer": "👨‍💻 Desarrollador",
             "version": "📦 Versión",
             "stack": "🛠️ Stack",
@@ -30,7 +30,7 @@
             "more": "\n... y más {count} feeds."
         },
         "dashboard": {
-            "title": "🛰️ **PANEL DE INTELIGENCIA MAFTY**\nConfigure los filtros de noticias abajo:",
+            "title": "🛰️ **PANEL DE GameBot**\nConfigure los filtros de noticias abajo:",
             "created": "✅ Dashboard creado! Canal configurado: <#{channel}>",
             "error": "❌ Fallo al abrir el panel."
         },
@@ -48,7 +48,7 @@
         "new_news": "📰 Nueva Inteligencia"
     },
     "embed": {
-        "author": "🛰️ INTEL MAFTY",
+        "author": "🛰️ GameBot",
         "source": "Fuente: {source}"
     }
 }

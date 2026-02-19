@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 from typing import Optional, List, Tuple
 import logging
 
-log = logging.getLogger("MaftyIntel")
+log = logging.getLogger("GameBot")
 
 # IPs privados e locais que devem ser bloqueados (anti-SSRF)
 PRIVATE_IP_RANGES = [

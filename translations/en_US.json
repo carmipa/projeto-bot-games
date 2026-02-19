@@ -1,11 +1,11 @@
 {
     "bot": {
-        "name": "Mafty Intelligence System",
-        "description": "Gundam News Bot"
+        "name": "GameBot",
+        "description": "GameBot"
     },
     "commands": {
         "help": {
-            "title": "📖 Operations Manual - Mafty Intel",
+            "title": "📖 Operations Manual - GameBot",
             "config": "🛠️ Configuration (Admin)",
             "set_canal": "**/set_canal** - Set the channel where the bot will send news",
             "dashboard": "**/dashboard** - Visual panel to configure filters",
@@ -21,11 +21,11 @@
             "response": "🏓 **Pong!** Latency: `{latency}ms`"
         },
         "about": {
-            "description": "Bot specialized in monitoring Gundam news.\nCollects info from RSS, YouTube, and official sites, translates to your language, and posts to configured channels.",
+            "description": "Bot for game news and trailers.\nCollects info from RSS, YouTube, and official sites, translates to your language, and posts to configured channels.",
             "developer": "👨‍💻 Developer",
             "version": "📦 Version",
             "stack": "🛠️ Stack",
-            "footer": "Mankind has to change... or be changed."
+            "footer": "Game news and trailers on your Discord."
         },
         "feeds": {
             "title": "📡 Monitored Feeds ({total})",
@@ -41,7 +41,7 @@
             "error_admin": "❌ You need **Administrator** permission to use this command."
         },
         "dashboard": {
-            "title": "🛰️ **MAFTY INTELLIGENCE DASHBOARD**\nConfigure news filters below:",
+            "title": "🛰️ **GameBot — Dashboard**\nConfigure news filters below:",
             "created": "✅ Dashboard created! Channel configured: <#{channel}>",
             "error": "❌ Failed to open dashboard."
         },
@@ -67,7 +67,7 @@
         "new_news": "📰 New Intelligence"
     },
     "embed": {
-        "author": "🛰️ INTEL MAFTY",
+        "author": "🎮 GameBot",
         "source": "Source: {source}"
     }
 }

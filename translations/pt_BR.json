@@ -1,11 +1,11 @@
 {
     "bot": {
-        "name": "Sistema de Inteligência Mafty",
-        "description": "Bot de Notícias Gundam"
+        "name": "GameBot",
+        "description": "Bot de Notícias de Jogos"
     },
     "commands": {
         "help": {
-            "title": "📖 Manual de Operações - Mafty Intel",
+            "title": "📖 Manual de Operações - GameBot",
             "config": "🛠️ Configuração (Admin)",
             "set_canal": "**/set_canal** - Define o canal onde o bot enviará notícias",
             "dashboard": "**/dashboard** - Painel visual para configurar filtros",
@@ -21,11 +21,11 @@
             "response": "🏓 **Pong!** Latência: `{latency}ms`"
         },
         "about": {
-            "description": "Bot especializado em monitoramento de notícias Gundam.\nColeta informações de RSS, YouTube e sites oficiais, traduz para PT-BR e publica em canais configurados.",
+            "description": "Bot de notícias e trailers de jogos.\nColeta informações de RSS, YouTube e sites oficiais, traduz para PT-BR e publica em canais configurados.",
             "developer": "👨‍💻 Desenvolvedor",
             "version": "📦 Versão",
             "stack": "🛠️ Stack",
-            "footer": "A Humanidade precisa mudar... ou ser mudada."
+            "footer": "Notícias e trailers de jogos no seu Discord."
         },
         "feeds": {
             "title": "📡 Feeds Monitorados ({total})",
@@ -41,7 +41,7 @@
             "error_admin": "❌ Você precisa ter **Administrador** para usar este comando."
         },
         "dashboard": {
-            "title": "🛰️ **PAINEL DE INTELIGÊNCIA MAFTY**\nConfigure os filtros de notícias abaixo:",
+            "title": "🛰️ **GameBot — Painel**\nConfigure os filtros de notícias abaixo:",
             "created": "✅ Dashboard criado! Canal configurado: <#{channel}>",
             "error": "❌ Falha ao abrir o painel."
         },
@@ -67,7 +67,7 @@
         "new_news": "📰 Nova Inteligência"
     },
     "embed": {
-        "author": "🛰️ INTEL MAFTY",
+        "author": "🎮 GameBot",
         "source": "Fonte: {source}"
     }
 }

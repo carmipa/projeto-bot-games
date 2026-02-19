@@ -1,4 +1,4 @@
-# 🎮 Game News & Trailers Bot — Documentation (EN)
+# 🎮 GameBot — Documentation (EN)
 
 Discord bot for **game news and trailers**. Monitors releases, DLCs, YouTube trailers, and game updates, with category filters and multi-server support.
 
@@ -253,4 +253,4 @@ MIT. Free for personal and commercial use.
 
 ---
 
-**Game News & Trailers Bot** — Game news and trailers in your Discord.
+**GameBot** — Game news and trailers in your Discord.

@@ -1,9 +1,12 @@
-
+"""
+Legacy script: example for resolving YouTube @handles to channel_id feed URLs.
+Current game sources are in sources.json. This file kept for reference.
+"""
 import sys
 import re
 import httpx
 
-# GundamInfo
+# Example (legacy): GundamInfo
 # view-source:https://www.youtube.com/@GundamInfo 
 # canonical: https://www.youtube.com/channel/UCejtUitnpnf8Be-v5NuDSLw (Wait, this IS GundamInfo)
 

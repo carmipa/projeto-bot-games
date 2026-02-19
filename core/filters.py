@@ -12,7 +12,7 @@ from utils.html import clean_html
 CAT_MAP = {
     "gunpla":  ["gunpla", "model kit", "kit", "ver.ka", "p-bandai", "premium bandai", "hg ", "mg ", "rg ", "pg ", "sd ", "fm ", "re/100"],
     "filmes":  ["anime", "episode", "movie", "film", "pv", "trailer", "teaser", "series", "season", "seed freedom", "witch from mercury", "hathaway"],
-    "games":   ["game", "steam", "ps5", "xbox", "gbo2", "battle operation", "breaker", "gundam breaker"],
+    "games":   ["game", "steam", "ps5", "xbox", "battle operation", "breaker", "nintendo", "playstation", "pc game"],
     "musica":  ["music", "ost", "soundtrack", "album", "opening", "ending"],
     "fashion": ["fashion", "clothing", "apparel", "t-shirt", "hoodie", "jacket", "merch"],
 }

@@ -2,7 +2,7 @@ FROM python:3.10-slim
 
 # Metadata
 LABEL maintainer="Paulo André Carminati"
-LABEL description="Gundam News Discord Bot - Mafty Intelligence System"
+LABEL description="GameBot Discord Bot"
 
 # Variáveis de ambiente
 ENV PYTHONUNBUFFERED=1 \

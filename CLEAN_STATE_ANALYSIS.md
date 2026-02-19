@@ -1,7 +1,7 @@
 # 🧹 Análise: Comando `/clean_state` - Limpeza do state.json
 
 **Data:** 13 de Fevereiro de 2026  
-**Versão:** 2.1 "Mafty Sovereign"
+**Versão:** 2.1 "v2.1"
 
 ---
 

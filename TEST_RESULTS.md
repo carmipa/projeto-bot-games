@@ -1,7 +1,7 @@
-# ✅ Resultados dos Testes - Gundam News Bot
+# ✅ Resultados dos Testes - GameBot
 
 **Data:** 13 de Fevereiro de 2026  
-**Versão:** 2.1 "Mafty Sovereign"
+**Versão:** 2.1 "v2.1"
 
 ---
 

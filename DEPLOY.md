@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="assets/icon.png" alt="Game News &amp; Trailers Bot" width="200"/>
+  <img src="assets/icon.png" alt="GameBot" width="200"/>
 </p>
 
-<h1 align="center">🐳 Guia de Deploy — Mafty Intelligence System</h1>
+<h1 align="center">🐳 Guia de Deploy — GameBot</h1>
 
 <p align="center">
-  <b>Deploy do bot Gundam News em VPS Linux com Docker</b><br>
+  <b>Deploy do bot GameBot em VPS Linux com Docker</b><br>
   <i>Rápido, seguro e automatizado</i>
 </p>
 
@@ -62,9 +62,9 @@ docker-compose --version  # docker-compose version 1.29.x
 
 ```bash
 # Criar diretório
-sudo mkdir -p /opt/gundam-bot
-sudo chown $USER:$USER /opt/gundam-bot
-cd /opt/gundam-bot
+sudo mkdir -p /opt/projeto-bot-games
+sudo chown $USER:$USER /opt/projeto-bot-games
+cd /opt/projeto-bot-games
 
 # Copiar arquivos do projeto para o servidor
 ```
@@ -73,7 +73,7 @@ cd /opt/gundam-bot
 
 ```bash
 # Do seu PC Windows:
-scp -r ./* user@seu-servidor:/opt/gundam-bot/
+scp -r ./* user@seu-servidor:/opt/projeto-bot-games/
 ```
 
 ---
@@ -127,7 +127,7 @@ docker-compose ps
 ```
     Name              Command        State
 -----------------------------------------------
-gundam-news-bot   python -u main.py  Up
+projeto-bot-games   python -u main.py  Up
 ```
 
 **Ver logs em tempo real:**
@@ -139,7 +139,7 @@ docker-compose logs -f
 **Mensagem de sucesso nos logs:**
 
 ```
-✅ Bot conectado como Mafty#1234
+✅ Bot conectado como GameBot#1234
 📡 Iniciando loop de varredura (30 min)
 ```
 
@@ -162,7 +162,7 @@ docker-compose logs -f
 
 ```bash
 # Atualizar código
-cd /opt/gundam-bot
+cd /opt/projeto-bot-games
 # Faça backup e atualize os arquivos manualmente
 
 # Reiniciar bot com novo código
@@ -177,13 +177,13 @@ docker-compose up -d --build
 
 ```bash
 # Entrar no container (modo interativo)
-docker-compose exec gundam-bot bash
+docker-compose exec bot bash
 
 # Executar Python no container
-docker-compose exec gundam-bot python -c "print('Hello from container')"
+docker-compose exec bot python -c "print('Hello from container')"
 
 # Ver uso de recursos
-docker stats gundam-news-bot
+docker stats projeto-bot-games
 
 # Limpar containers antigos e cache
 docker system prune -a
@@ -206,7 +206,7 @@ docker-compose logs --tail=50
 | Erro | Solução |
 |------|---------|
 | `Invalid token` | Verificar DISCORD_TOKEN no .env |
-| `Permission denied` | `sudo chown $USER:$USER /opt/gundam-bot` |
+| `Permission denied` | `sudo chown $USER:$USER /opt/projeto-bot-games` |
 | `Port already in use` | Verificar se outro container está rodando |
 | `No module named 'discord'` | Rebuild: `docker-compose up -d --build` |
 
@@ -217,7 +217,7 @@ docker-compose logs --tail=50
 **Verificar política:**
 
 ```bash
-docker inspect gundam-news-bot | grep -A 5 RestartPolicy
+docker inspect projeto-bot-games | grep -A 5 RestartPolicy
 ```
 
 Deve mostrar: `"Name": "unless-stopped"`
@@ -254,17 +254,17 @@ docker-compose up -d
 docker-compose ps
 
 # Healthcheck
-docker inspect gundam-news-bot | grep -A 10 Health
+docker inspect projeto-bot-games | grep -A 10 Health
 
 # Uso de recursos (CPU, RAM, Rede)
-docker stats gundam-news-bot
+docker stats projeto-bot-games
 ```
 
 **Saída esperada do stats:**
 
 ```
 NAME              CPU %   MEM USAGE / LIMIT    MEM %
-gundam-news-bot   0.5%    120MiB / 2GiB       6%
+projeto-bot-games   0.5%    120MiB / 2GiB       6%
 ```
 
 ### Logs Estruturados
@@ -318,15 +318,15 @@ sudo ufw status
 
 ```bash
 # Criar backup com timestamp
-cd /opt/gundam-bot
-tar -czf ~/gundam-backup-$(date +%Y%m%d-%H%M%S).tar.gz \
+cd /opt/projeto-bot-games
+tar -czf ~/bot-games-backup-$(date +%Y%m%d-%H%M%S).tar.gz \
   config.json \
   history.json \
   state.json \
   .env
 
 # Download para PC local
-scp user@servidor:~/gundam-backup-*.tar.gz ./Desktop/
+scp user@servidor:~/bot-games-backup-*.tar.gz ./Desktop/
 ```
 
 ### Backup Automático (Cron)
@@ -336,19 +336,19 @@ scp user@servidor:~/gundam-backup-*.tar.gz ./Desktop/
 crontab -e
 
 # Adicionar backup diário às 3h da manhã
-0 3 * * * cd /opt/gundam-bot && tar -czf ~/backups/gundam-$(date +\%Y\%m\%d).tar.gz config.json history.json state.json .env
+0 3 * * * cd /opt/projeto-bot-games && tar -czf ~/backups/bot-games-$(date +\%Y\%m\%d).tar.gz config.json history.json state.json .env
 ```
 
 ### Restore
 
 ```bash
 # Upload do backup
-scp ./gundam-backup-20260104.tar.gz user@servidor:~/
+scp ./bot-games-backup-20260104.tar.gz user@servidor:~/
 
 # Restaurar
-cd /opt/gundam-bot
+cd /opt/projeto-bot-games
 docker-compose down
-tar -xzf ~/gundam-backup-20260104.tar.gz
+tar -xzf ~/bot-games-backup-20260104.tar.gz
 docker-compose up -d
 ```
 
@@ -360,24 +360,24 @@ docker-compose up -d
 
 ```bash
 # Fazer backup completo
-cd /opt/gundam-bot
-tar -czf gundam-full-backup.tar.gz *
+cd /opt/projeto-bot-games
+tar -czf bot-games-full-backup.tar.gz *
 
 # Download
-scp user@servidor-antigo:/opt/gundam-bot/gundam-full-backup.tar.gz ./
+scp user@servidor-antigo:/opt/projeto-bot-games/bot-games-full-backup.tar.gz ./
 ```
 
 ### Servidor Novo
 
 ```bash
 # Preparar diretório
-sudo mkdir -p /opt/gundam-bot
-sudo chown $USER:$USER /opt/gundam-bot
-cd /opt/gundam-bot
+sudo mkdir -p /opt/projeto-bot-games
+sudo chown $USER:$USER /opt/projeto-bot-games
+cd /opt/projeto-bot-games
 
 # Upload e extrair
-scp gundam-full-backup.tar.gz user@servidor-novo:/opt/gundam-bot/
-tar -xzf gundam-full-backup.tar.gz
+scp bot-games-full-backup.tar.gz user@servidor-novo:/opt/projeto-bot-games/
+tar -xzf bot-games-full-backup.tar.gz
 
 # Instalar Docker (se necessário)
 curl -fsSL https://get.docker.com | sh
@@ -399,7 +399,7 @@ docker-compose logs -f
 ### Minor Updates (ex: v2.1.0 → v2.1.1)
 
 ```bash
-cd /opt/gundam-bot
+cd /opt/projeto-bot-games
 git pull
 docker-compose restart
 ```
@@ -426,7 +426,7 @@ docker-compose logs -f
 ## 📂 Estrutura de Arquivos no Servidor
 
 ```
-/opt/gundam-bot/
+/opt/projeto-bot-games/
 ├── 🐳 Docker
 │   ├── Dockerfile              # Build da imagem
 │   ├── docker-compose.yml      # Orquestração
@@ -486,17 +486,17 @@ docker-compose logs -f
 
 ```bash
 # Ver todas as variáveis de ambiente
-docker-compose exec gundam-bot env
+docker-compose exec bot env
 
 # Verificar Python e módulos instalados
-docker-compose exec gundam-bot python --version
-docker-compose exec gundam-bot pip list
+docker-compose exec bot python --version
+docker-compose exec bot pip list
 
 # Testar conexão Discord
-docker-compose exec gundam-bot python -c "import discord; print(discord.__version__)"
+docker-compose exec bot python -c "import discord; print(discord.__version__)"
 
 # Ver configuração JSON
-docker-compose exec gundam-bot cat config.json | python -m json.tool
+docker-compose exec bot cat config.json | python -m json.tool
 ```
 
 ---
@@ -517,5 +517,5 @@ docker-compose exec gundam-bot cat config.json | python -m json.tool
 
 <p align="center">
   <b>🎉 Bot está ONLINE e rodando!</b><br>
-  <i>Desenvolvido com ❤️ para a comunidade Gundam</i>
+  <i>Desenvolvido com ❤️ para a comunidade de jogos</i>
 </p>

@@ -11,7 +11,7 @@ from core.scanner import load_sources
 from utils.translator import t
 from utils.storage import p, load_json_safe, save_json_safe
 
-log = logging.getLogger("MaftyIntel")
+log = logging.getLogger("GameBot")
 
 
 class InfoCog(commands.Cog):
@@ -29,7 +29,7 @@ class InfoCog(commands.Cog):
         msg = t.get('commands.ping.response', lang=lang, latency=latency)
         await interaction.response.send_message(msg, ephemeral=True)
 
-    @app_commands.command(name="about", description="Sobre o Mafty Intelligence System.")
+    @app_commands.command(name="about", description="Sobre o GameBot.")
     async def about(self, interaction: discord.Interaction):
         lang = t.detect_lang(str(interaction.guild_id), interaction.guild_locale)
         
