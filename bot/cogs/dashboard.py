@@ -44,10 +44,6 @@ class DashboardCog(commands.Cog):
         # Define canal
         cfg[guild_id]["channel_id"] = channel_id
         
-        # Garante filtros
-        if "filters" not in cfg[guild_id]:
-            cfg[guild_id]["filters"] = []
-        
         # Salva
         save_json_safe(p("config.json"), cfg)
         
@@ -56,10 +52,11 @@ class DashboardCog(commands.Cog):
         # Cria view
         view = FilterDashboard(int(guild_id))
         
-        # Envia painel no canal
-        msg = await interaction.channel.send(
+        # Envia painel no canal (apenas idioma; filtros removidos)
+        await interaction.channel.send(
             "🎮 **GameBot — Painel**\n"
-            "Configure os filtros de notícias abaixo:",
+            "Canal configurado. Todas as notícias serão enviadas aqui.\n"
+            "Escolha o idioma abaixo (opcional):",
             view=view
         )
         
@@ -168,10 +165,6 @@ class DashboardCog(commands.Cog):
         
         # Define novo canal
         cfg[guild_id]["channel_id"] = channel_id
-        
-        # Garante que filtros existam (não remove se já existirem)
-        if "filters" not in cfg[guild_id]:
-            cfg[guild_id]["filters"] = []
         
         # Salva
         save_json_safe(p("config.json"), cfg)

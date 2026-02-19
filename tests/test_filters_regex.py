@@ -7,7 +7,7 @@ def test_contains_any_basic_match():
     keywords = ["game", "steam"]
     assert _contains_any("i love game news", keywords) is True
     assert _contains_any("steam release", keywords) is True
-    assert _contains_any("no games here", keywords) is False
+    assert _contains_any("no robots here", keywords) is False
 
 def test_contains_any_word_boundaries():
     """Test that it respects word boundaries (no partial matches)."""

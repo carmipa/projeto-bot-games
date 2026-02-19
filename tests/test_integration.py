@@ -37,21 +37,17 @@ def test_integration_load_config_and_state():
 
 
 def test_integration_match_intel_with_real_config_shape():
-    """match_intel aceita config no formato real (guild_id -> {filters, channel_id})."""
+    """match_intel: guild com channel_id recebe tudo; sem channel_id não recebe."""
     from core.filters import match_intel
 
     config = {
-        "123456": {"filters": ["todos"], "channel_id": 789},
-        "654321": {"filters": ["games", "filmes"], "channel_id": 790},
+        "123456": {"channel_id": 789},
+        "654321": {"channel_id": 790},
     }
-    # TUDO passa com "todos"
-    assert match_intel("123456", "Any Game News", "Summary here", config) is True
-    # Categoria "games" bate em "new game"
-    assert match_intel("654321", "New game on Steam", "release", config) is True
-    # Sem match de categoria
-    assert match_intel("654321", "Clima hoje", "sol", config) is False
-    # Guild inexistente
+    assert match_intel("123456", "Any title", "Any summary", config) is True
+    assert match_intel("654321", "Other news", "Text", config) is True
     assert match_intel("999", "Title", "Summary", config) is False
+    assert match_intel("123456", "X", "Y", {"123456": {}}) is False
 
 
 def test_integration_stats_module():

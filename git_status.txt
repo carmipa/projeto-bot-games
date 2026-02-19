@@ -1,0 +1,16 @@
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   bot/cogs/dashboard.py
+	modified:   bot/views/filter_dashboard.py
+	modified:   core/filters.py
+	modified:   tests/test_integration.py
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	git_status.txt
+
+no changes added to commit (use "git add" and/or "git commit -a")
