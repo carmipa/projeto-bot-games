@@ -26,16 +26,23 @@ class AdminCog(commands.Cog):
         """Força uma varredura imediata sem abrir o dashboard."""
         try:
             await interaction.response.defer(ephemeral=True)
+        except discord.NotFound:
+            log.warning("Interação /forcecheck expirada (Unknown interaction). Use o comando novamente.")
+            return
+        except Exception as e:
+            log.exception(f"Erro ao defer em /forcecheck: {e}")
+            return
+        try:
             await self.run_scan_once(trigger="forcecheck")
             await interaction.followup.send("✅ Varredura forçada concluída!", ephemeral=True)
         except Exception as e:
-            log.exception(f"❌ Erro crítico em /forcecheck: {e}")
+            log.exception(f"Erro ao executar varredura em /forcecheck: {e}")
             try:
                 await interaction.followup.send("❌ Falha ao executar varredura.", ephemeral=True)
-            except discord.HTTPException as http_err:
-                log.warning(f"Falha ao enviar mensagem de erro ao usuário: {http_err}")
+            except (discord.NotFound, discord.HTTPException):
+                pass
             except Exception as unexpected_err:
-                log.error(f"Erro inesperado ao tentar notificar usuário sobre falha: {unexpected_err}")
+                log.error(f"Erro ao notificar usuário: {unexpected_err}")
     
     @forcecheck.error
     async def forcecheck_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
