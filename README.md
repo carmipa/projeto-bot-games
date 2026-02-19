@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/icon.png" alt="Game News &amp; Trailers Bot" width="120"/>
+  <img src="/icon.png" alt="Game News &amp; Trailers Bot" width="120"/>
 </p>
 
 # 🎮 Game News & Trailers Bot
