@@ -31,7 +31,7 @@ from utils.cache import load_http_state, save_http_state, get_cache_headers, upd
 from utils.translator import translate_to_target, t
 from utils.security import validate_url
 from core.stats import stats
-from core.filters import should_post_to_guild
+from core.filters import should_post_to_guild, should_skip_by_content
 from core.html_monitor import check_official_sites
 
 log = logging.getLogger("GameBot")
@@ -277,6 +277,33 @@ def parse_entry_dt(entry: Any) -> datetime:
         
     return None
 
+
+def get_youtube_duration_seconds(entry: Any) -> int | None:
+    """
+    Extrai duração do vídeo em segundos a partir da entrada do feed (YouTube Atom/RSS).
+    Retorna None se não houver informação de duração.
+    """
+    try:
+        media = getattr(entry, "media_content", None)
+        if media and isinstance(media, list) and len(media) > 0:
+            first = media[0]
+            if isinstance(first, dict):
+                dur = first.get("duration")
+            else:
+                dur = getattr(first, "duration", None)
+            if dur is not None:
+                return int(dur)
+        # Alguns feeds usam media_group ou atributo direto
+        if hasattr(entry, "media_group") and entry.media_group:
+            for g in entry.media_group if isinstance(entry.media_group, list) else [entry.media_group]:
+                dur = g.get("duration") if isinstance(g, dict) else getattr(g, "duration", None)
+                if dur is not None:
+                    return int(dur)
+    except (TypeError, ValueError, AttributeError):
+        pass
+    return None
+
+
 def get_news_metadata(title: str, url: str) -> tuple[str, discord.Color]:
     """
     Retorna (prefixo, cor) baseado em keywords e source url.
@@ -351,6 +378,7 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
         state.setdefault("http_cache", {})
         state.setdefault("html_hashes", {})
         state.setdefault("last_cleanup", 0)
+        state.setdefault("source_failures", {})  # Source Health Monitor: url -> {count, last_error, last_ts}
 
         # Regra de Auto-Limpeza (Cleanup) a cada 7 dias
         now_ts = time.time()
@@ -384,55 +412,93 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
         
         MAX_CONCURRENT_FEEDS = 5
         semaphore = asyncio.Semaphore(MAX_CONCURRENT_FEEDS)
+        RSS_BACKOFF = [1, 2, 4]  # Exponential backoff (segundos)
+        RSS_MAX_RETRIES = 3
+        source_failures = state["source_failures"]
 
         async def fetch_and_process_feed(session, url):
             nonlocal cache_hits, state
-            
+
             async with semaphore:
-                try:
-                    # Validação de segurança: anti-SSRF
-                    is_valid, error_msg = validate_url(url)
-                    if not is_valid:
-                        log.warning(f"🔒 URL bloqueada por segurança: {url} - {error_msg}")
-                        return None
-                    
-                    if "youtube.com" in url or "youtu.be" in url:
-                        await asyncio.sleep(2)
-                        
-                    request_headers = get_cache_headers(url, http_cache)
-                    
-                    async with session.get(url, headers=request_headers) as resp:
-                        if resp.status == 304:
-                            cache_hits += 1
-                            log.debug(f"📦 Cache hit: {url} (304)")
+                # Validação de segurança: anti-SSRF
+                is_valid, error_msg = validate_url(url)
+                if not is_valid:
+                    log.warning(f"🔒 URL bloqueada por segurança: {url} - {error_msg}")
+                    return None
+
+                if "youtube.com" in url or "youtu.be" in url:
+                    await asyncio.sleep(2)
+
+                request_headers = get_cache_headers(url, http_cache)
+                last_error: Exception | None = None
+
+                for attempt in range(RSS_MAX_RETRIES):
+                    try:
+                        async with session.get(url, headers=request_headers) as resp:
+                            if resp.status == 304:
+                                cache_hits += 1
+                                log.debug(f"📦 Cache hit: {url} (304)")
+                                if url in source_failures:
+                                    source_failures[url]["count"] = 0
+                                return None
+
+                            if resp.status == 431:
+                                log.warning(f"⚠️ Twitter/X Error: Header value too long (431) - {url}")
+                                return None
+
+                            update_cache_state(url, resp.headers, http_cache)
+                            text = await resp.text(errors="ignore")
+
+                        loop = asyncio.get_running_loop()
+                        feed = await loop.run_in_executor(None, lambda: feedparser.parse(text))
+
+                        entries = getattr(feed, "entries", []) or []
+
+                        if not entries and resp.status == 200:
+                            log.warning(f"⚠️ Feed retornou 200 OK mas 0 entradas: {url}")
+
+                        if url in source_failures:
+                            source_failures[url]["count"] = 0
+                        return (url, entries)
+
+                    except (aiohttp.ClientError, asyncio.TimeoutError, OSError) as e:
+                        last_error = e
+                        if attempt < RSS_MAX_RETRIES - 1:
+                            delay = RSS_BACKOFF[attempt]
+                            log.debug(f"Retry em {delay}s para feed '{url}' (tentativa {attempt + 1}): {e}")
+                            await asyncio.sleep(delay)
+                        else:
+                            rec = source_failures.setdefault(url, {"count": 0, "last_error": "", "last_ts": 0})
+                            rec["count"] = rec.get("count", 0) + 1
+                            rec["last_error"] = str(e)
+                            rec["last_ts"] = time.time()
+                            log.error(f"❌ Erro de conexão ao baixar feed '{url}' após {RSS_MAX_RETRIES} tentativas: {e}")
+                            if rec["count"] >= 3:
+                                log.error(
+                                    f"🔴 [Source Health] Fonte RSS falhou {rec['count']} vezes: {url} | "
+                                    f"last_error={rec.get('last_error')} | Verifique conectividade ou remova a fonte."
+                                )
                             return None
-                        
-                        if resp.status == 431:
-                            log.warning(f"⚠️ Twitter/X Error: Header value too long (431) - {url}")
+                    except Exception as e:
+                        last_error = e
+                        if attempt < RSS_MAX_RETRIES - 1:
+                            delay = RSS_BACKOFF[attempt]
+                            log.debug(f"Retry em {delay}s para feed '{url}' (tentativa {attempt + 1}): {e}")
+                            await asyncio.sleep(delay)
+                        else:
+                            rec = source_failures.setdefault(url, {"count": 0, "last_error": "", "last_ts": 0})
+                            rec["count"] = rec.get("count", 0) + 1
+                            rec["last_error"] = f"{type(e).__name__}: {e}"
+                            rec["last_ts"] = time.time()
+                            log.error(f"❌ Falha inesperada ao processar feed '{url}': {type(e).__name__}: {e}", exc_info=True)
+                            if rec["count"] >= 3:
+                                log.error(
+                                    f"🔴 [Source Health] Fonte RSS falhou {rec['count']} vezes: {url} | "
+                                    f"last_error={rec.get('last_error')}"
+                                )
                             return None
 
-                        update_cache_state(url, resp.headers, http_cache)
-                        text = await resp.text(errors="ignore")
-                    
-                    loop = asyncio.get_running_loop()
-                    feed = await loop.run_in_executor(None, lambda: feedparser.parse(text))
-                    
-                    entries = getattr(feed, "entries", []) or []
-                    
-                    if not entries and resp.status == 200:
-                         log.warning(f"⚠️ Feed retornou 200 OK mas 0 entradas: {url}")
-                         
-                    return (url, entries)
-                    
-                except aiohttp.ClientError as e:
-                    log.error(f"❌ Erro de conexão ao baixar feed '{url}': {e}")
-                    return None
-                except asyncio.TimeoutError as e:
-                    log.warning(f"⏱️ Timeout ao baixar feed '{url}': {e}")
-                    return None
-                except Exception as e:
-                    log.error(f"❌ Falha inesperada ao processar feed '{url}': {type(e).__name__}: {e}", exc_info=True)
-                    return None
+                return None
 
         async with aiohttp.ClientSession(connector=connector, headers=base_headers, timeout=timeout) as session:
             # Converte URLs de canais YouTube (@usuario ou /channel/) para feed RSS (channel_id)
@@ -475,20 +541,31 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                     if is_cold_start and feed_posted_count >= 3:
                          continue
 
-                    # Filtragem por data
+                    # Filtragem por data: nunca publicar notícias com mais de 7 dias (inclui Cold Start)
                     entry_dt = parse_entry_dt(entry)
                     if entry_dt:
                         now = datetime.now(entry_dt.tzinfo) if entry_dt.tzinfo else datetime.now()
                         age = now - entry_dt
-                        
-                        # Se NÃO for Cold Start, aplica regra de 7 dias
-                        if not is_cold_start:
-                            if age.days > 7:
-                                log.debug(f"👴 [Old] Ignorado (idade {age.days}d): {link}")
-                                continue
+                        if age.days > 7:
+                            log.debug(f"👴 [Old] Ignorado (idade {age.days}d, máx. 7 dias): {link}")
+                            continue
 
                     title = entry.get("title") or ""
                     summary = entry.get("summary") or entry.get("description") or ""
+
+                    # Filtro de conteúdo (LIXO_FILTER): descarta ruído e loga
+                    if should_skip_by_content(title, summary):
+                        log.debug(f"🛡️ [Filtro] Ruído filtrado: {title[:50]}...")
+                        continue
+
+                    # GRC: vídeos YouTube com mais de 12 min são descartados (podcasts/entrevistas), exceto Official Gameplay / Reveal
+                    if "youtube.com" in link or "youtu.be" in link:
+                        duration_sec = get_youtube_duration_seconds(entry)
+                        if duration_sec is not None and duration_sec > 12 * 60:
+                            title_lower = (title or "").lower()
+                            if "official gameplay" not in title_lower and "reveal" not in title_lower:
+                                log.debug(f"🛡️ [Filtro] Vídeo longo descartado ({duration_sec // 60} min): {title[:50]}...")
+                                continue
 
                     posted_anywhere = False
 
@@ -539,22 +616,32 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                             log.debug(f"Erro ao verificar domínio de mídia para '{link[:50]}...': {e}")
 
                         try:
+                            from utils.translator import t
+                            # Data/hora oficial da matéria ou vídeo (quando o feed fornece)
+                            pub_dt = entry_dt if entry_dt else None
+                            embed_ts = pub_dt if pub_dt else datetime.now()
+                            # Discord exige datetime timezone-aware para timestamp do embed
+                            if embed_ts.tzinfo is None:
+                                embed_ts = embed_ts.replace(tzinfo=timezone.utc)
+
                             # Embed para notícias
                             embed = discord.Embed(
                                 title=t_translated[:256],
                                 description=s_translated,
                                 url=link,
                                 color=embed_color,
-                                timestamp=datetime.now()
+                                timestamp=embed_ts
                             )
-                            from utils.translator import t
                             author_name = t.get('embed.author', lang=target_lang)
                             # Usa avatar do bot se disponível
                             icon_url = bot.user.avatar.url if bot.user and bot.user.avatar else None
                             embed.set_author(name=author_name, icon_url=icon_url)
-                            
+
                             source_domain = urlparse(link).netloc
                             footer_text = t.get('embed.source', lang=target_lang, source=source_domain)
+                            if pub_dt:
+                                date_str = pub_dt.strftime("%d/%m/%Y %H:%M")
+                                footer_text = f"{footer_text} • {t.get('embed.published_at', lang=target_lang, date=date_str)}"
                             embed.set_footer(text=footer_text)
                             
                             if hasattr(entry, "media_thumbnail") and entry.media_thumbnail:
@@ -609,7 +696,7 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
             log.info("🔎 Verificando sites oficiais (HTML Watcher)...")
             # Passa apenas o dicionário de hashes para o monitor
             # Se check_official_sites retornar updates, atualizamos o state principal
-            html_updates, new_hashes = await check_official_sites(html_hashes)
+            html_updates, new_hashes = await check_official_sites(html_hashes, full_state=state)
             
             if html_updates:
                 log.info(f"✨ {len(html_updates)} atualizações em sites oficiais detectadas!")

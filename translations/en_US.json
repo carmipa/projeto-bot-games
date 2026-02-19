@@ -66,8 +66,9 @@
         "no_guilds": "⚠️ No guilds configured with 'channel_id'. Use /set_canal or /dashboard to configure.",
         "new_news": "📰 GameBot — New news"
     },
-    "embed": {
+"embed": {
         "author": "🎮 GameBot",
-        "source": "Source: {source}"
-    }
+        "source": "Source: {source}",
+        "published_at": "Published {date}"
+}
 }

@@ -5,7 +5,6 @@
     "https://store.steampowered.com/feeds/news.xml",
 
     "https://www.rockpapershotgun.com/feed",
-    "https://www.polygon.com/rss/index.xml",
     "https://www.vg247.com/feed",
     "https://www.gamespot.com/feeds/mashup/",
     "http://www.gamesindustry.biz/rss/gamesindustry_news_feed.rss",
@@ -24,7 +23,6 @@
     "https://www.escapistmagazine.com/v2/feed/"
   ],
   "youtube_feeds": [
-    "https://www.youtube.com/@IndieHub01",
     "https://www.youtube.com/feeds/videos.xml?channel_id=UCJx5KP-pCUmL9eZUv-mIcNw",
     "https://www.youtube.com/feeds/videos.xml?channel_id=UCKy1dAqELo0zrOtPkf0eTMw",
     "https://www.youtube.com/feeds/videos.xml?channel_id=UCKy1dAqELo0zrOtPkf0eTMw",
@@ -40,7 +38,6 @@
     "https://www.youtube.com/@unity",
 
     "https://www.youtube.com/@EA",
-    "https://www.youtube.com/@EASPORTS",
     "https://www.youtube.com/@Battlefield",
     "https://www.youtube.com/feeds/videos.xml?channel_id=UCBMvc6jppNwQHAfuYAt977Q",
     "https://www.youtube.com/@WBGAMES",
@@ -51,8 +48,6 @@
     "https://www.youtube.com/@Blizzard",
     "https://www.youtube.com/feeds/videos.xml?channel_id=UCZ6Xy6id-X-D_O4R_K-vQ0A",
     "https://www.youtube.com/@RiotGames",
-    "https://www.youtube.com/@VALORANT",
-    "https://www.youtube.com/@LeagueofLegends",
     "https://www.youtube.com/feeds/videos.xml?channel_id=UCo166z1D9U6D_67M-M2M8WQ",
     "https://www.youtube.com/@GOG",
 
@@ -128,7 +123,6 @@
 
     "https://www.ign.com/",
     "https://www.gamespot.com/",
-    "https://www.polygon.com/",
     "https://www.eurogamer.net/",
     "https://www.rockpapershotgun.com/",
     "https://www.gamesindustry.biz/",

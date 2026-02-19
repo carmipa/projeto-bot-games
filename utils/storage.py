@@ -68,12 +68,14 @@ def load_json_safe(filepath: str, default: Any) -> Any:
 
 def save_json_safe(filepath: str, data: Any) -> None:
     """
-    Salva JSON com indentação; em erro, loga e segue.
+    Salva JSON com indentação de forma atômica (write temp + rename) para evitar corrupção.
+    Em erro, loga e segue.
     
     Args:
         filepath: Caminho do arquivo JSON
         data: Dados a salvar
     """
+    tmp = filepath + ".tmp"
     try:
         if os.path.isdir(filepath):
             log.error(f"Não é possível salvar: '{filepath}' é um diretório.")
@@ -81,16 +83,38 @@ def save_json_safe(filepath: str, data: Any) -> None:
         parent = os.path.dirname(filepath)
         if parent and not os.path.isdir(parent):
             os.makedirs(parent, exist_ok=True)
-        with open(filepath, "w", encoding="utf-8") as f:
+        with open(tmp, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
+        # Atômico: replace sobrescreve o destino; em crash o .tmp fica, o original intacto
+        os.replace(tmp, filepath)
     except PermissionError as e:
         log.error(f"Sem permissão para escrever '{filepath}': {e}")
+        if os.path.exists(tmp):
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
     except OSError as e:
         log.error(f"Erro de sistema ao salvar '{filepath}': {e}")
+        if os.path.exists(tmp):
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
     except TypeError as e:
         log.error(f"Dados não serializáveis em JSON ao salvar '{filepath}': {e}")
+        if os.path.exists(tmp):
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
     except Exception as e:
         log.error(f"Falha inesperada ao salvar '{filepath}': {type(e).__name__}: {e}", exc_info=True)
+        if os.path.exists(tmp):
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
 
 
 def create_backup(filepath: str, backup_dir: str = "backups") -> Optional[str]:
