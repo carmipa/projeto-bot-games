@@ -13,15 +13,13 @@ services:
     env_file:
       - .env
 
-    # Volumes para persistir dados
-    volumes:
-      # Arquivos de configuração e histórico
-      - ./config.json:/app/config.json
-      - ./history.json:/app/history.json
-      - ./state.json:/app/state.json
-      - ./sources.json:/app/sources.json
+    # Usa diretório de dados para evitar "Is a directory" quando arquivos não existem no host
+    environment:
+      - DATA_DIR=/app/data
 
-      # Logs persistentes (opcional)
+    # Volumes: um único diretório (o entrypoint cria config/state/history/sources se não existirem)
+    volumes:
+      - ./data:/app/data
       - ./logs:/app/logs
 
     # Configuração de logs

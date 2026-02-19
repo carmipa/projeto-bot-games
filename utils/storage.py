@@ -11,9 +11,16 @@ from typing import Any, Dict, Tuple, Optional
 log = logging.getLogger("GameBot")
 
 
+def _base_dir() -> str:
+    """Diretório base: DATA_DIR no Docker, senão CWD."""
+    base = os.environ.get("DATA_DIR", "").strip()
+    return base if base else os.path.abspath(".")
+
+
 def p(filename: str) -> str:
     """
     Retorna o caminho absoluto para um arquivo no diretório raiz do bot.
+    Com DATA_DIR (ex.: no Docker), usa esse diretório como base.
     
     Args:
         filename: Nome do arquivo (ex: 'config.json')
@@ -21,7 +28,7 @@ def p(filename: str) -> str:
     Returns:
         Caminho absoluto do arquivo
     """
-    return os.path.abspath(filename)
+    return os.path.join(_base_dir(), filename)
 
 
 def load_json_safe(filepath: str, default: Any) -> Any:
@@ -38,6 +45,9 @@ def load_json_safe(filepath: str, default: Any) -> Any:
     try:
         if not os.path.exists(filepath):
             log.warning(f"Arquivo '{filepath}' não existe. Usando padrão.")
+            return default
+        if os.path.isdir(filepath):
+            log.error(f"'{filepath}' é um diretório, não um arquivo. Use DATA_DIR e monte um diretório no Docker. Usando padrão.")
             return default
         if os.path.getsize(filepath) == 0:
             log.warning(f"Arquivo '{filepath}' está vazio. Usando padrão.")
@@ -64,6 +74,12 @@ def save_json_safe(filepath: str, data: Any) -> None:
         data: Dados a salvar
     """
     try:
+        if os.path.isdir(filepath):
+            log.error(f"Não é possível salvar: '{filepath}' é um diretório.")
+            return
+        parent = os.path.dirname(filepath)
+        if parent and not os.path.isdir(parent):
+            os.makedirs(parent, exist_ok=True)
         with open(filepath, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
     except PermissionError as e:

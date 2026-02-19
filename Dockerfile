@@ -25,15 +25,16 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copia código do bot
-# Copia todo o código do projeto
 COPY . .
 
-# Cria diretórios para dados persistentes (serão volumes)
+# Entrypoint que cria arquivos em DATA_DIR se necessário
+RUN chmod +x /app/entrypoint.sh
+
+# Cria diretório para volume de dados
 RUN mkdir -p /app/data /app/logs
 
-# Healthcheck (verifica se bot está rodando e se config existe)
+# Healthcheck: config existe em DATA_DIR ou em /app
 HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=3 \
-    CMD python -c "import os; exit(0 if os.path.exists('/app/config.json') else 1)"
+    CMD python -c "import os; d=os.environ.get('DATA_DIR','/app'); exit(0 if os.path.isfile(os.path.join(d,'config.json')) or os.path.isfile('/app/config.json') else 1)"
 
-# Comando de execução
-CMD ["python", "-u", "main.py"]
+ENTRYPOINT ["./entrypoint.sh"]
