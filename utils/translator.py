@@ -18,7 +18,7 @@ class Translator:
     def __init__(self):
         self.translations: Dict[str, dict] = {}
         self.default_lang = 'en_US'
-        self.supported_langs = ['en_US', 'pt_BR', 'es_ES', 'it_IT']
+        self.supported_langs = ['en_US', 'pt_BR']
         self._load_all()
     
     def _load_all(self):
@@ -58,10 +58,9 @@ class Translator:
             if normalized in self.supported_langs:
                 return normalized
             
-            # Mapas específicos
+            # Apenas inglês e português Brasil
             maps = {
                 'en-GB': 'en_US',
-                'es-419': 'es_ES',
                 'pt-BR': 'pt_BR'
             }
             return maps.get(locale_str, self.default_lang)
@@ -110,10 +109,8 @@ async def translate_to_target(text: str, target_lang: str) -> str:
         google_map = {
             'pt_BR': 'pt',
             'en_US': 'en',
-            'es_ES': 'es',
-            'it_IT': 'it'
         }
-        target = google_map.get(target_lang, 'en')
+        target = google_map.get(target_lang) or 'en'
         
         loop = asyncio.get_running_loop()
         trad = await loop.run_in_executor(

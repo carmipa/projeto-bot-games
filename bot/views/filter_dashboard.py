@@ -55,9 +55,6 @@ class FilterDashboard(discord.ui.View):
         languages = {
             "en_US": "🇺🇸",
             "pt_BR": "🇧🇷",
-            "es_ES": "🇪🇸",
-            "it_IT": "🇮🇹",
-            "ja_JP": "🇯🇵"
         }
         for code, flag in languages.items():
             style = discord.ButtonStyle.primary if code == current_lang else discord.ButtonStyle.secondary
@@ -82,7 +79,7 @@ class FilterDashboard(discord.ui.View):
         lang_code = parts[3]
         self._set_lang(lang_code)
         self._rebuild()
-        flags = {"en_US": "🇺🇸", "pt_BR": "🇧🇷", "es_ES": "🇪🇸", "it_IT": "🇮🇹", "ja_JP": "🇯🇵"}
+        flags = {"en_US": "🇺🇸", "pt_BR": "🇧🇷"}
         flag = flags.get(lang_code, "🏳️")
         await interaction.response.edit_message(view=self)
         await interaction.followup.send(f"🌐 Idioma alterado para {flag} **{lang_code}**", ephemeral=True)

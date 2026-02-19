@@ -50,13 +50,10 @@ class InfoCog(commands.Cog):
         await interaction.response.send_message(embed=embed)
 
     @app_commands.command(name="setlang", description="Define o idioma do bot para este servidor.")
-    @app_commands.describe(idioma="Escolha: en_US, pt_BR, es_ES, it_IT")
+    @app_commands.describe(idioma="English ou Português (Brasil)")
     @app_commands.choices(idioma=[
         app_commands.Choice(name="🇺🇸 English", value="en_US"),
-        app_commands.Choice(name="🇧🇷 Português", value="pt_BR"),
-        app_commands.Choice(name="🇪🇸 Español", value="es_ES"),
-        app_commands.Choice(name="🇮🇹 Italiano", value="it_IT"),
-        app_commands.Choice(name="🇯🇵 日本語", value="ja_JP")
+        app_commands.Choice(name="🇧🇷 Português (Brasil)", value="pt_BR"),
     ])
     @app_commands.checks.has_permissions(administrator=True)
     async def setlang(self, interaction: discord.Interaction, idioma: str):
@@ -71,10 +68,8 @@ class InfoCog(commands.Cog):
         save_json_safe(p("config.json"), cfg)
         
         msgs = {
-            "pt_BR": "✅ Idioma alterado para **Português**.",
+            "pt_BR": "✅ Idioma alterado para **Português (Brasil)**.",
             "en_US": "✅ Language set to **English**.",
-            "es_ES": "✅ Idioma cambiado a **Español**.",
-            "it_IT": "✅ Lingua impostata su **Italiano**."
         }
         
         await interaction.response.send_message(msgs.get(idioma, "✅ Language updated."), ephemeral=True)
