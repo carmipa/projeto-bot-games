@@ -336,7 +336,7 @@ scp user@servidor:~/bot-games-backup-*.tar.gz ./Desktop/
 crontab -e
 
 # Adicionar backup diário às 3h da manhã
-0 3 * * * cd /opt/projeto-bot-games && tar -czf ~/backups/bot-games-$(date +\%Y\%m\%d).tar.gz config.json history.json state.json .env
+0 3 * * * cd /opt/projeto-bot-games && tar -czf ~/backups/bot-games-$(date +\%Y\%m\%d).tar.gz data/ .env
 ```
 
 ### Restore
@@ -425,17 +425,25 @@ docker-compose logs -f
 
 ## 📂 Estrutura de Arquivos no Servidor
 
+O bot usa o diretório **`./data`** para persistir configuração e estado (evita erro "Is a directory" no Docker). Na primeira execução, o entrypoint cria `data/config.json`, `data/state.json`, `data/history.json` e copia `sources.json` se não existirem.
+
 ```
 /opt/projeto-bot-games/
+├── data/                       # Volume montado no container (DATA_DIR)
+│   ├── config.json             # Canal e idioma por servidor
+│   ├── state.json              # Cache e dedup
+│   ├── history.json            # Links já enviados
+│   └── sources.json            # Feeds RSS (cópia na 1ª execução)
+├── logs/                       # Logs do bot
 ├── 🐳 Docker
-│   ├── Dockerfile              # Build da imagem
-│   ├── docker-compose.yml      # Orquestração
-│   └── .dockerignore           # Otimização
+│   ├── Dockerfile
+│   ├── docker-compose.yml
+│   └── entrypoint.sh           # Cria arquivos em data/ se necessário
 │
 ├── 🤖 Bot
-│   ├── main.py                 # Entry point
-│   ├── settings.py             # Configurações
-│   ├── sources.json            # Feeds RSS
+│   ├── main.py
+│   ├── settings.py
+│   ├── sources.json            # Feeds padrão (dentro da imagem)
 │   ├── requirements.txt        # Dependências
 │   │
 │   ├── 📁 bot/                 # Cogs e Views
@@ -496,7 +504,7 @@ docker-compose exec bot pip list
 docker-compose exec bot python -c "import discord; print(discord.__version__)"
 
 # Ver configuração JSON
-docker-compose exec bot cat config.json | python -m json.tool
+docker-compose exec bot cat /app/data/config.json | python -m json.tool
 ```
 
 ---
