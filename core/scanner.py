@@ -24,7 +24,7 @@ from utils.cache import load_http_state, save_http_state, get_cache_headers, upd
 from utils.translator import translate_to_target, t
 from utils.security import validate_url
 from core.stats import stats
-from core.filters import match_intel
+from core.filters import should_post_to_guild
 from core.html_monitor import check_official_sites
 
 log = logging.getLogger("GameBot")
@@ -202,7 +202,7 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
         return
 
     async with scan_lock:
-        log.info(f"🔎 Iniciando varredura de inteligência... (trigger={trigger})")
+        log.info(f"🔎 Iniciando varredura de notícias (GameBot)... (trigger={trigger})")
 
         config = load_json_safe(p("config.json"), {})
         
@@ -376,7 +376,7 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                         channel_id = gdata.get("channel_id")
                         if not isinstance(channel_id, int): continue
 
-                        if not match_intel(str(gid), title, summary, config):
+                        if not should_post_to_guild(str(gid), title, summary, config):
                             log.debug(f"🛡️ [Filtro] Guild {gid} bloqueou: {title[:50]}...")
                             continue
                         
@@ -508,9 +508,8 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                         except Exception:
                             channel = None
                         
-                        # APLICA FILTRO DE INTELIGÊNCIA TAMBÉM NO MONITOR HTML
-                        # Isso impede que sites genéricos (Mantan, Eiga) spammem mudanças irrelevantes
-                        if not match_intel(str(gid), u_title, u_summary, config):
+                        # Aplica filtro por guild (canal configurado) também no monitor HTML
+                        if not should_post_to_guild(str(gid), u_title, u_summary, config):
                             log.debug(f"🛡️ [Filtro HTML] Guild {gid} bloqueou site: {u_title}")
                             continue
 
@@ -550,24 +549,20 @@ def start_scheduler(bot: discord.Client):
     global loop_task
     
     @tasks.loop(minutes=LOOP_MINUTES)
-    async def intelligence_gathering():
+    async def news_scan_loop():
         try:
             await run_scan_once(bot, trigger="loop")
         except Exception as e:
-            log.exception(f"🔥 Erro não tratado dentro do loop 'intelligence_gathering': {e}")
-            # Importante: O loop do discord.ext.tasks pode parar se o erro subir.
-            # Este try/except garante que o erro seja logado e a task continue no próximo intervalo.
+            log.exception(f"🔥 Erro não tratado no loop de notícias: {e}")
 
-    @intelligence_gathering.error
-    async def intelligence_gathering_error(error):
-        log.exception(f"💀 Erro Fatal no Loop (tasks.loop): {error}")
-        # Tenta reiniciar o loop se ele tiver morrido
-        # (Nota: intelligence_gathering.restart() não é método padrão documentado, melhor apenas logar)
-    
-    @intelligence_gathering.before_loop
+    @news_scan_loop.error
+    async def news_scan_loop_error(error):
+        log.exception(f"💀 Erro no loop de varredura: {error}")
+
+    @news_scan_loop.before_loop
     async def _before_loop():
         await bot.wait_until_ready()
-    
-    loop_task = intelligence_gathering
+
+    loop_task = news_scan_loop
     loop_task.start()
     log.info(f"🔄 Agendador de tarefas iniciado ({LOOP_MINUTES} min).")

@@ -36,18 +36,18 @@ def test_integration_load_config_and_state():
     assert isinstance(state, dict)
 
 
-def test_integration_match_intel_with_real_config_shape():
-    """match_intel: guild com channel_id recebe tudo; sem channel_id não recebe."""
-    from core.filters import match_intel
+def test_integration_should_post_to_guild():
+    """should_post_to_guild: guild com channel_id recebe tudo; sem channel_id não recebe."""
+    from core.filters import should_post_to_guild
 
     config = {
         "123456": {"channel_id": 789},
         "654321": {"channel_id": 790},
     }
-    assert match_intel("123456", "Any title", "Any summary", config) is True
-    assert match_intel("654321", "Other news", "Text", config) is True
-    assert match_intel("999", "Title", "Summary", config) is False
-    assert match_intel("123456", "X", "Y", {"123456": {}}) is False
+    assert should_post_to_guild("123456", "Any title", "Any summary", config) is True
+    assert should_post_to_guild("654321", "Other news", "Text", config) is True
+    assert should_post_to_guild("999", "Title", "Summary", config) is False
+    assert should_post_to_guild("123456", "X", "Y", {"123456": {}}) is False
 
 
 def test_integration_stats_module():

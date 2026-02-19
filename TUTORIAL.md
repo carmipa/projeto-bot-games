@@ -116,7 +116,7 @@ Testa a velocidade de resposta do bot em milissegundos.
 1. **Vídeos no Chat:**
     O bot possui um player nativo! Links do YouTube e Twitch postados por ele podem ser assistidos diretamente dentro do Discord, sem abrir o navegador.
 
-2. **Filtros Inteligentes:**
+2. **Configuração (canal e idioma):**
     O bot usa um sistema de "camadas". Se você notar que notícias gerais de anime (como One Piece) não aparecem, é porque o filtro **Anti-Spam** está funcionando corretamente, focando apenas no notícias de jogos.
 
 3. **Monitoramento Oficial:**

@@ -61,10 +61,10 @@
         }
     },
     "scanner": {
-        "starting": "🔎 Iniciando varredura de inteligência... (gatilho={trigger})",
+        "starting": "🔎 Iniciando varredura de notícias... (gatilho={trigger})",
         "completed": "✅ Varredura concluída. (enviadas={sent}, cache={hits}/{total}, gatilho={trigger})",
         "no_guilds": "⚠️ Nenhuma guilda configurada com 'channel_id'. Use /set_canal ou /dashboard para configurar.",
-        "new_news": "📰 Nova Inteligência"
+        "new_news": "📰 GameBot — Nova notícia"
     },
     "embed": {
         "author": "🎮 GameBot",

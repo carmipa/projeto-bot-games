@@ -11,24 +11,25 @@ from typing import Any, Dict, Tuple, Optional
 log = logging.getLogger("GameBot")
 
 
+# Só estes arquivos vão para DATA_DIR no Docker; o resto (translations/, web/, etc.) fica no app.
+_DATA_FILES = ("config.json", "state.json", "history.json", "sources.json")
+
+
 def _base_dir() -> str:
-    """Diretório base: DATA_DIR no Docker, senão CWD."""
+    """Diretório base para dados: DATA_DIR no Docker, senão CWD."""
     base = os.environ.get("DATA_DIR", "").strip()
     return base if base else os.path.abspath(".")
 
 
 def p(filename: str) -> str:
     """
-    Retorna o caminho absoluto para um arquivo no diretório raiz do bot.
-    Com DATA_DIR (ex.: no Docker), usa esse diretório como base.
-    
-    Args:
-        filename: Nome do arquivo (ex: 'config.json')
-    
-    Returns:
-        Caminho absoluto do arquivo
+    Retorna o caminho absoluto para um arquivo.
+    Só config, state, history e sources usam DATA_DIR; traduções e outros ficam no diretório do app.
     """
-    return os.path.join(_base_dir(), filename)
+    name = os.path.basename(filename)
+    if name in _DATA_FILES:
+        return os.path.join(_base_dir(), filename)
+    return os.path.abspath(filename)
 
 
 def load_json_safe(filepath: str, default: Any) -> Any:

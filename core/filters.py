@@ -15,7 +15,7 @@ def _contains_any(text: str, keywords: List[str]) -> bool:
     return bool(re.search(pattern, text))
 
 
-def match_intel(guild_id: str, title: str, summary: str, config: Dict[str, Any]) -> bool:
+def should_post_to_guild(guild_id: str, title: str, summary: str, config: Dict[str, Any]) -> bool:
     """
     Decide se notícia deve ir para a guild.
     Se o servidor tem canal configurado, recebe todas as notícias (sem filtros).

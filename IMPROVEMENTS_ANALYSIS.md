@@ -77,7 +77,7 @@ for result in results:
         # Processa uma vez e distribui para guilds relevantes
         processed_entry = process_entry(entry)
         for gid, gdata in guild_configs.items():
-            if match_intel(gid, processed_entry, gdata):
+            if should_post_to_guild(gid, title, summary, config):
                 await send_to_guild(gid, processed_entry)
 ```
 

@@ -61,10 +61,10 @@
         }
     },
     "scanner": {
-        "starting": "🔎 Starting intelligence scan... (trigger={trigger})",
+        "starting": "🔎 Starting news scan... (trigger={trigger})",
         "completed": "✅ Scan completed. (sent={sent}, cache={hits}/{total}, trigger={trigger})",
         "no_guilds": "⚠️ No guilds configured with 'channel_id'. Use /set_canal or /dashboard to configure.",
-        "new_news": "📰 New Intelligence"
+        "new_news": "📰 GameBot — New news"
     },
     "embed": {
         "author": "🎮 GameBot",
