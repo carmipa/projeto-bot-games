@@ -4,6 +4,7 @@ Scanner module - Feed fetching and processing logic.
 import ssl
 import asyncio
 import logging
+import re
 import feedparser
 import aiohttp
 import certifi
@@ -13,6 +14,12 @@ from typing import List, Set, Tuple, Dict, Any
 from urllib.parse import urlparse, urlunparse
 import time
 import os
+
+# User-Agent de navegador real (evita bloqueio ao resolver canais YouTube @ e em requisições sensíveis)
+BROWSER_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/120.0.0.0 Safari/537.36"
+)
 
 import discord
 from discord.ext import tasks
@@ -99,6 +106,120 @@ def load_sources() -> List[str]:
     return out
 
 
+# -----------------------------------------
+# YouTube @ / channel → feed RSS (channel_id)
+# -----------------------------------------
+
+def _is_youtube_url(url: str) -> bool:
+    return "youtube.com" in url or "youtu.be" in url
+
+
+def _is_youtube_feed_url(url: str) -> bool:
+    return "youtube.com/feeds/videos.xml" in url and "channel_id=" in url
+
+
+def _youtube_channel_id_from_url(url: str) -> str | None:
+    """Extrai channel_id (UC...) de URL do tipo /channel/UC..."""
+    m = re.search(r"youtube\.com/channel/(UC[A-Za-z0-9_-]{22})", url)
+    return m.group(1) if m else None
+
+
+def _load_youtube_feed_map() -> Dict[str, str]:
+    """Carrega o mapeamento @username -> feed RSS do sources.json (poupa requisições)."""
+    sources = load_json_safe(p("sources.json"), {})
+    return sources.get("youtube_feed_map") or {}
+
+
+async def get_yt_rss(
+    session: aiohttp.ClientSession,
+    url: str,
+    cache: Dict[str, str],
+    timeout: aiohttp.ClientTimeout,
+    feed_map: Dict[str, str] | None = None,
+) -> str:
+    """
+    Converte URL de canal YouTube (@username ou /channel/UC...) para o feed RSS oficial.
+    Se o ID estiver mapeado em sources.json (youtube_feed_map), usa o link XML direto para poupar recursos.
+    Caso contrário, faz request à página e extrai o channelId do código fonte.
+    """
+    if not _is_youtube_url(url):
+        return url
+    if _is_youtube_feed_url(url):
+        return url
+
+    # 1. Mapa no JSON: usa feed direto sem fazer request
+    if feed_map is None:
+        feed_map = _load_youtube_feed_map()
+    if url in feed_map:
+        log.debug(f"YouTube: usando feed do mapa para {url}")
+        return feed_map[url]
+
+    # 2. URL já é /channel/UC...: monta feed
+    channel_id = _youtube_channel_id_from_url(url)
+    if channel_id:
+        return f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
+
+    # 3. Cache em memória (state)
+    if url in cache:
+        return cache[url]
+
+    # 4. Fallback: request à página e extração do channelId do HTML
+    return await _fetch_youtube_channel_id_from_page(session, url, cache, timeout)
+
+
+async def _fetch_youtube_channel_id_from_page(
+    session: aiohttp.ClientSession,
+    url: str,
+    cache: Dict[str, str],
+    timeout: aiohttp.ClientTimeout,
+) -> str:
+    """Faz GET na página do canal e extrai channelId do código fonte (fallback quando não está no mapa)."""
+    try:
+        headers = {"User-Agent": BROWSER_USER_AGENT, "Accept-Language": "en-US,en;q=0.9"}
+        async with session.get(url, headers=headers, timeout=timeout) as resp:
+            if resp.status != 200:
+                log.debug(f"YouTube resolve: {url} retornou {resp.status}. Mantendo URL original.")
+                return url
+            html = await resp.text(errors="ignore")
+    except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+        log.warning(f"YouTube resolve: falha ao acessar {url}: {e}. Mantendo URL original.")
+        return url
+
+    # YouTube embute channelId no HTML (ytInitialData ou meta)
+    m = re.search(r'"channelId"\s*:\s*"(UC[A-Za-z0-9_-]{22})"', html)
+    if not m:
+        m = re.search(r'channel_id=([A-Za-z0-9_-]{24})', html)
+    if not m:
+        m = re.search(r'/channel/(UC[A-Za-z0-9_-]{22})', html)
+    channel_id = m.group(1) if m else None
+
+    if channel_id:
+        feed_url = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
+        cache[url] = feed_url
+        log.info(f"YouTube: @ resolvido para feed RSS: {url} -> {feed_url}")
+        return feed_url
+
+    log.debug(f"YouTube: não foi possível extrair channel_id de {url}. Mantendo URL original.")
+    return url
+
+
+async def resolve_youtube_urls(
+    session: aiohttp.ClientSession,
+    urls: List[str],
+    state: Dict[str, Any],
+    timeout: aiohttp.ClientTimeout,
+) -> List[str]:
+    """Resolve todas as URLs de canal YouTube (@ ou /channel/) para URLs de feed RSS."""
+    cache = state.setdefault("youtube_feed_cache", {})
+    feed_map = _load_youtube_feed_map()
+    resolved: List[str] = []
+    for u in urls:
+        if _is_youtube_url(u) and not _is_youtube_feed_url(u):
+            r = await get_yt_rss(session, u, cache, timeout, feed_map)
+            resolved.append(r)
+        else:
+            resolved.append(u)
+    return resolved
 
 
 def sanitize_link(link: str) -> str:
@@ -314,7 +435,9 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                     return None
 
         async with aiohttp.ClientSession(connector=connector, headers=base_headers, timeout=timeout) as session:
-            tasks = [fetch_and_process_feed(session, url) for url in urls]
+            # Converte URLs de canais YouTube (@usuario ou /channel/) para feed RSS (channel_id)
+            resolved_urls = await resolve_youtube_urls(session, urls, state, timeout)
+            tasks = [fetch_and_process_feed(session, url) for url in resolved_urls]
             results = await asyncio.gather(*tasks)
             
             for result in results:
@@ -461,8 +584,8 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                             sent_count += 1
                             if is_cold_start:
                                 feed_posted_count += 1
-                            
-                            await asyncio.sleep(1)
+                            # Delay anti-spam (GRC): evita rate limit e detecção de spam pelo Discord
+                            await asyncio.sleep(2)
 
                         except discord.Forbidden as e:
                             log.error(f"🚫 Sem permissão para enviar mensagem no canal {channel_id} (guild {gid}): {e}")
