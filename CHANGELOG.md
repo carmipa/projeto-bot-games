@@ -4,6 +4,26 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 
 ---
 
+## [2.1.1] - 2026-02-19
+
+### ✨ Adicionado
+
+- **Intervalo de varredura: 12h** — Padrão alterado de 6h (360 min) para 12h (720 min)
+- **COMANDOS.md** — Lista rápida de comandos para referência
+- **Exponential backoff** — Retry com backoff (1s, 2s, 4s) em falhas de RSS e HTML Monitor
+- **Source Health Monitor** — Log detalhado quando fonte falha 3+ vezes
+- **User-Agents rotativos** — Lista rotativa no HTML Monitor para evitar bloqueios (Rockstar, Activision)
+- **Escrita atômica** — `history.json` e `state.json` gravados via temp + rename para evitar corrupção
+- **LIXO_FILTER ampliado** — Bloqueio de campeonatos (championship, campeonato, vct, valorant, euic, vgc)
+
+### 📝 Melhorado
+
+- **Logs específicos** — Prefixos [Scheduler], [Scanner], [HTML Monitor] para facilitar busca
+- **Exceções** — Tratamento específico (Forbidden, HTTPException) no envio de alertas HTML
+- **Documentação** — README, docs/, COMMANDS_REFERENCE e nova COMANDOS.md atualizados
+
+---
+
 ## [2.1.0] - 2026-02-13
 
 ### ✨ Adicionado

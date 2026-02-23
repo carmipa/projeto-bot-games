@@ -27,7 +27,7 @@ Discord bot for **game news and trailers**. Monitors releases, DLCs, YouTube tra
 | 📡 **Periodic scanner** | Scans RSS/Atom/YouTube feeds at configurable intervals |
 | 🎬 **Trailers** | YouTube videos with native Discord player |
 | 🎛️ **Persistent dashboard** | Button panel that works after bot restart |
-| 🎯 **Category filters** | Games, Trailers, etc. + "ALL" option |
+| 🎯 **Content filters** | LIXO_FILTER: blocks eSports, reviews, guides; max 7 days |
 | 🔄 **Deduplication** | Never repeats news (history in `history.json`) |
 | 🌐 **Multi-guild** | Independent configuration per Discord server |
 | 🖥️ **Web dashboard** | Real-time panel (optional, port 8080) |
@@ -99,7 +99,7 @@ Full guide: [DEPLOY.md](DEPLOY.md)
 |----------|----------|-------------|
 | `DISCORD_TOKEN` | ✅ | Discord bot token |
 | `COMMAND_PREFIX` | ❌ | Command prefix (default: `!`) |
-| `LOOP_MINUTES` | ❌ | Scanner interval in minutes (default: 45) |
+| `LOOP_MINUTES` | ❌ | Scanner interval in minutes (default: 720 = 12h) |
 | `LOG_LEVEL` | ❌ | DEBUG, INFO, WARNING, ERROR |
 | `WEB_AUTH_TOKEN` | ❌ | Web dashboard token (recommended in production) |
 | `WEB_HOST` | ❌ | e.g. 127.0.0.1 or 0.0.0.0 |
@@ -129,7 +129,8 @@ Full guide: [DEPLOY.md](DEPLOY.md)
 
 | Command | Description |
 |---------|-------------|
-| `/status` | Uptime, scans, and news posted |
+| `/status` | Uptime, scans, news posted, next scan time |
+| `/now` | Forces immediate verification |
 | `/feeds` | Lists monitored sources |
 | `/about` | About the bot and version |
 | `/ping` | Bot latency |
@@ -150,7 +151,7 @@ Full guide: [DEPLOY.md](DEPLOY.md)
 
 **`/clean_state` types:** `dedup` (history), `http_cache`, `html_hashes`, `tudo`. A backup is always created before cleaning.
 
-Full reference: [COMMANDS_REFERENCE.md](COMMANDS_REFERENCE.md)
+Full reference: [COMMANDS_REFERENCE.md](../COMMANDS_REFERENCE.md) | Quick list: [COMANDOS.md](../COMANDOS.md)
 
 ---
 
@@ -160,15 +161,10 @@ The panel (command `/dashboard`) allows:
 
 | Button | Function |
 |--------|----------|
-| 🌟 **ALL** | Toggle all categories |
-| 🤖 **Games** | Game news |
-| 🎬 **Trailers / Movies** | Trailers, teasers, videos |
-| 🎵 **Music** | OST, soundtracks |
-| 👕 **Fashion/Merch** | Merchandise |
-| 📌 **View filters** | Shows active filters |
-| 🔄 **Reset** | Clears all filters |
+| 🇺🇸 **English** | English language |
+| 🇧🇷 **Português** | Portuguese (Brazil) language |
 
-Indicators: 🟢 Green = active, ⚪ Gray = inactive. Languages (PT/EN) can also be selected in the panel.
+The panel also sets the current channel automatically. All news approved by the filter are sent to the configured channel.
 
 ---
 

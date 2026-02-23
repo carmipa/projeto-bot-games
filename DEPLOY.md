@@ -94,7 +94,7 @@ DISCORD_TOKEN=seu_token_discord_aqui
 
 # ⚙️ OPCIONAL (valores padrão)
 COMMAND_PREFIX=!
-LOOP_MINUTES=30
+LOOP_MINUTES=720
 ```
 
 **Dica:** Obtenha seu token em <https://discord.com/developers/applications>

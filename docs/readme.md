@@ -27,7 +27,7 @@ Bot de Discord para **notícias e trailers de jogos**. Monitora lançamentos, DL
 | 📡 **Scanner periódico** | Varredura de feeds RSS/Atom/YouTube em intervalos configuráveis |
 | 🎬 **Trailers** | Vídeos do YouTube com player nativo no Discord |
 | 🎛️ **Dashboard persistente** | Painel com botões que funciona após restart do bot |
-| 🎯 **Filtros por categoria** | Games, Trailers, etc. + opção "TUDO" |
+| 🎯 **Filtros de conteúdo** | LIXO_FILTER: bloqueia eSports, reviews, guias; máximo 7 dias |
 | 🔄 **Deduplicação** | Não repete notícias (histórico em `history.json`) |
 | 🌐 **Multi-Guild** | Configuração independente por servidor Discord |
 | 🖥️ **Web Dashboard** | Painel em tempo real (opcional, porta 8080) |
@@ -99,7 +99,7 @@ Guia completo: [DEPLOY.md](DEPLOY.md)
 |----------|-------------|-----------|
 | `DISCORD_TOKEN` | ✅ | Token do bot do Discord |
 | `COMMAND_PREFIX` | ❌ | Prefixo de comandos (padrão: `!`) |
-| `LOOP_MINUTES` | ❌ | Intervalo do scanner em minutos (padrão: 45) |
+| `LOOP_MINUTES` | ❌ | Intervalo do scanner em minutos (padrão: 720 = 12h) |
 | `LOG_LEVEL` | ❌ | DEBUG, INFO, WARNING, ERROR |
 | `WEB_AUTH_TOKEN` | ❌ | Token do dashboard web (recomendado em produção) |
 | `WEB_HOST` | ❌ | Ex.: 127.0.0.1 ou 0.0.0.0 |
@@ -129,7 +129,8 @@ Guia completo: [DEPLOY.md](DEPLOY.md)
 
 | Comando | Descrição |
 |---------|-----------|
-| `/status` | Uptime, varreduras e notícias enviadas |
+| `/status` | Uptime, varreduras, notícias enviadas, próxima varredura |
+| `/now` | Força verificação imediata |
 | `/feeds` | Lista as fontes monitoradas |
 | `/about` | Sobre o bot e versão |
 | `/ping` | Latência do bot |
@@ -150,7 +151,7 @@ Guia completo: [DEPLOY.md](DEPLOY.md)
 
 **Tipos do `/clean_state`:** `dedup` (histórico), `http_cache`, `html_hashes`, `tudo`. Sempre é feito backup antes da limpeza.
 
-Referência completa: [COMMANDS_REFERENCE.md](COMMANDS_REFERENCE.md)
+Referência completa: [COMMANDS_REFERENCE.md](../COMMANDS_REFERENCE.md) | Lista rápida: [COMANDOS.md](../COMANDOS.md)
 
 ---
 
@@ -160,15 +161,10 @@ O painel (comando `/dashboard`) permite:
 
 | Botão | Função |
 |-------|--------|
-| 🌟 **TUDO** | Ativa/desativa todas as categorias |
-| 🤖 **Games** | Notícias de jogos |
-| 🎬 **Trailers / Filmes** | Trailers, teasers, vídeos |
-| 🎵 **Música** | OST, trilhas |
-| 👕 **Fashion/Merch** | Merchandise |
-| 📌 **Ver filtros** | Mostra filtros ativos |
-| 🔄 **Reset** | Limpa todos os filtros |
+| 🇺🇸 **English** | Idioma inglês |
+| 🇧🇷 **Português** | Idioma português (Brasil) |
 
-Indicadores: 🟢 Verde = ativo, ⚪ Cinza = inativo. Idiomas (PT/EN) também podem ser escolhidos no painel.
+O painel também configura o canal atual automaticamente. Todas as notícias aprovadas pelo filtro são enviadas ao canal configurado.
 
 ---
 

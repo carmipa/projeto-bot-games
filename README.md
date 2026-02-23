@@ -15,7 +15,7 @@ Bot de Discord para **notícias e trailers de jogos**. Monitora lançamentos, DL
 |--------|-----------|
 | 📰 **Notícias de jogos** | Lançamentos, DLCs, atualizações e anúncios |
 | 🎬 **Trailers** | Novos trailers (YouTube) com player nativo no Discord |
-| 🎯 **Filtros** | Por categoria (Games, Trailers, etc.) e por servidor |
+| 🎯 **Filtros** | LIXO_FILTER (eSports, reviews, guias bloqueados) + limite 7 dias |
 | 📡 **Scanner periódico** | Verificação automática em intervalos configuráveis |
 | 🖥️ **Dashboard web** | Painel de status em tempo real (opcional) |
 | 🌐 **Multi-idioma** | Português e Inglês |
@@ -65,7 +65,7 @@ python main.py
 |----------|-------------|-----------|
 | `DISCORD_TOKEN` | ✅ | Token do bot do Discord |
 | `COMMAND_PREFIX` | ❌ | Prefixo de comandos (padrão: `!`) |
-| `LOOP_MINUTES` | ❌ | Intervalo do scanner em minutos (padrão: 45) |
+| `LOOP_MINUTES` | ❌ | Intervalo do scanner em minutos (padrão: 720 = 12h) |
 | `LOG_LEVEL` | ❌ | Nível de log: DEBUG, INFO, WARNING, ERROR |
 | `WEB_HOST` / `WEB_PORT` | ❌ | Host e porta do dashboard web |
 | `WEB_AUTH_TOKEN` | ❌ | Token de autenticação do dashboard (recomendado em produção) |
@@ -74,7 +74,7 @@ python main.py
 
 1. Convide o bot para o seu servidor (com permissão de **Enviar Mensagens** e **Incorporar Links**).
 2. Use **`/set_canal`** no canal onde quer receber as notícias (ou **`/dashboard`** para abrir o painel).
-3. Configure os filtros no dashboard (categorias que deseja receber).
+3. Configure o idioma (PT-BR / EN) no dashboard.
 4. O bot começa a publicar automaticamente conforme o intervalo configurado.
 
 ---
@@ -94,7 +94,8 @@ python main.py
 
 | Comando | Descrição |
 |---------|-----------|
-| `/status` | Uptime, número de varreduras e notícias enviadas |
+| `/status` | Uptime, varreduras, notícias enviadas, próxima varredura |
+| `/now` | Força verificação imediata |
 | `/feeds` | Lista as fontes monitoradas |
 | `/about` | Sobre o bot e versão |
 | `/ping` | Latência do bot |
@@ -152,9 +153,10 @@ Documentação detalhada em **português** e **inglês** na pasta **`docs/`**:
 | Documento | Descrição |
 |-----------|-----------|
 | [docs/readme.md](docs/readme.md) | Documentação completa em **PT-BR** |
-| [docs/README_EN.md](docs/README_EN.md) | Full documentation in **English** |
-| [docs/DEPLOY.md](docs/DEPLOY.md) | Guia de deploy / Deploy guide |
-| [docs/COMMANDS_REFERENCE.md](docs/COMMANDS_REFERENCE.md) | Referência de comandos / Commands reference |
+| [docs/README_EN.md](docs/README_EN.md) | Documentação em **English** |
+| [DEPLOY.md](DEPLOY.md) | Guia de deploy com Docker |
+| [COMMANDS_REFERENCE.md](COMMANDS_REFERENCE.md) | Referência completa de comandos |
+| [COMANDOS.md](COMANDOS.md) | Lista rápida de comandos |
 | [docs/SECURITY_GRC_ANALYSIS.md](docs/SECURITY_GRC_ANALYSIS.md) | Análise de segurança / Security analysis |
 
 ---

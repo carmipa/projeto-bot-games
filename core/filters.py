@@ -8,6 +8,8 @@ from typing import Dict, Any, List
 # Lista de exclusão agressiva: se o título (ou resumo) contiver qualquer termo, descarta e loga "Ruído filtrado"
 LIXO_FILTER = [
     "esports", "e-sports", "tournament", "tournaments", "highlights",
+    "championship", "championships", "campeonato", "international championships",
+    "vct", "valorant", "champions tour", "euic", "vgc",  # eSports / competitivo
     "review", "reviews", "analise", "análise", "opiniao", "opinião", "opinion",
     "entrevista", "interview", "q&a", "qa", "q and a",
     "podcast", "unboxing",

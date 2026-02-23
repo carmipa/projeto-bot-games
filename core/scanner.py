@@ -333,7 +333,11 @@ def get_news_metadata(title: str, url: str) -> tuple[str, discord.Color]:
 def _log_next_run() -> None:
     """Log explícito do próximo horário de varredura."""
     nxt = datetime.now() + timedelta(minutes=LOOP_MINUTES)
-    log.info(f"⏳ Aguardando próxima varredura às {nxt:%Y-%m-%d %H:%M:%S} (em {LOOP_MINUTES} min)...")
+    interval_h = LOOP_MINUTES // 60
+    log.info(
+        f"⏳ Aguardando próxima varredura às {nxt:%Y-%m-%d %H:%M:%S} "
+        f"(intervalo: {interval_h}h / {LOOP_MINUTES} min)..."
+    )
 
 
 async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
@@ -715,7 +719,10 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
 
                         try:
                             channel = bot.get_channel(int(channel_id))
-                        except Exception:
+                        except (ValueError, TypeError) as e:
+                            log.warning(
+                                f"[HTML Monitor] Canal inválido para guild {gid} (channel_id={channel_id}): {e}"
+                            )
                             channel = None
                         
                         # Aplica filtro por guild (canal configurado) também no monitor HTML
@@ -724,14 +731,25 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                             continue
 
                         if channel:
-                            await channel.send(f"⚠️ **GameBot — Alerta**\n{u_title}\n{u_link}")
-                            sent_count += 1
+                            try:
+                                await channel.send(f"⚠️ **GameBot — Alerta**\n{u_title}\n{u_link}")
+                                sent_count += 1
+                            except discord.Forbidden:
+                                log.error(
+                                    f"[HTML Monitor] Sem permissão para enviar no canal {channel_id} (guild {gid})"
+                                )
+                            except discord.HTTPException as e:
+                                log.error(
+                                    f"[HTML Monitor] Erro HTTP ao enviar alerta no canal {channel_id}: {e.status} - {e.text}"
+                                )
             else:
                  if new_hashes != html_hashes:
                      state["html_hashes"] = new_hashes
                      
         except Exception as e:
-            log.error(f"❌ Erro no HTML Monitor: {e}")
+            log.exception(
+                f"❌ [HTML Monitor] Exceção ao verificar sites oficiais: {type(e).__name__}: {e}"
+            )
 
         # Salva TUDO em um único arquivo de forma atômica/safe
         save_history(history_list)
@@ -763,11 +781,13 @@ def start_scheduler(bot: discord.Client):
         try:
             await run_scan_once(bot, trigger="loop")
         except Exception as e:
-            log.exception(f"🔥 Erro não tratado no loop de notícias: {e}")
+            log.exception(
+                f"🔥 [Scanner] Exceção não tratada no loop de notícias: {type(e).__name__}: {e}"
+            )
 
     @news_scan_loop.error
     async def news_scan_loop_error(error):
-        log.exception(f"💀 Erro no loop de varredura: {error}")
+        log.exception(f"💀 [Scheduler] Erro no loop de varredura (tasks.loop): {error}")
 
     @news_scan_loop.before_loop
     async def _before_loop():
@@ -775,4 +795,7 @@ def start_scheduler(bot: discord.Client):
 
     loop_task = news_scan_loop
     loop_task.start()
-    log.info(f"🔄 Agendador de tarefas iniciado ({LOOP_MINUTES} min).")
+    interval_h = LOOP_MINUTES // 60
+    log.info(
+        f"🔄 [Scheduler] Agendador iniciado — intervalo de varredura: {interval_h}h ({LOOP_MINUTES} min)"
+    )

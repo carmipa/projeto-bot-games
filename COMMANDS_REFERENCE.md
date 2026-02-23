@@ -11,6 +11,8 @@
 - [📊 Comandos Informativos](#-comandos-informativos)
 - [📖 Guia de Uso Detalhado](#-guia-de-uso-detalhado)
 
+**Lista rápida:** Ver [COMANDOS.md](COMANDOS.md)
+
 ---
 
 ## 🔧 Comandos Administrativos
@@ -58,24 +60,14 @@
 ```
 
 **Funcionalidades:**
-- 🎛️ Configura filtros por categoria (Gunpla, Filmes, Games, etc.)
-- 🌐 Seleciona idioma (🇺🇸 🇧🇷 🇪🇸 🇮🇹 🇯🇵)
-- 📌 Visualiza filtros ativos
-- 🔄 Reseta configurações
+- 🌐 Seleciona idioma (🇺🇸 English / 🇧🇷 Português)
 - ⚙️ Configura o canal automaticamente
 
 **Botões Disponíveis:**
-- 🌟 **TUDO** - Liga/desliga todas as categorias
-- 🤖 **Gunpla** - Kits, P-Bandai, Ver.Ka
-- 🎬 **Filmes** - Anime, trailers, séries
-- 🎮 **Games** - Jogos
-- 🎵 **Música** - OST, álbuns
-- 👕 **Fashion** - Roupas e merchandise
-- 🌐 **Idioma** - Seleção de idioma
-- 📌 **Ver filtros** - Lista filtros ativos
-- 🔄 **Reset** - Limpa todos os filtros
+- 🇺🇸 **English** - Idioma inglês
+- 🇧🇷 **Português** - Idioma português (Brasil)
 
-**Nota:** O painel é **persistente** - funciona mesmo após restart do bot!
+**Nota:** O painel é **persistente** — funciona mesmo após restart do bot. Todas as notícias aprovadas pelo filtro são enviadas ao canal configurado.
 
 ---
 
@@ -91,16 +83,12 @@
 **Parâmetros:**
 - `idioma` (obrigatório): Código do idioma
   - `en_US` - 🇺🇸 English
-  - `pt_BR` - 🇧🇷 Português
-  - `es_ES` - 🇪🇸 Español
-  - `it_IT` - 🇮🇹 Italiano
-  - `ja_JP` - 🇯🇵 日本語
+  - `pt_BR` - 🇧🇷 Português (Brasil)
 
 **Exemplos:**
 ```
 /setlang idioma:pt_BR    # Português
 /setlang idioma:en_US    # Inglês
-/setlang idioma:ja_JP    # Japonês
 ```
 
 **Resposta:**
@@ -120,7 +108,7 @@
 **Uso:**
 - Útil para testar se o bot está funcionando
 - Quando você sabe que saiu uma notícia urgente
-- Não quer esperar o ciclo automático (30 min)
+- Não quer esperar o ciclo automático (padrão: 12h)
 
 **Resposta:**
 - ✅ Confirmação quando varredura concluída
@@ -233,12 +221,23 @@ HTML: 8          HTML: 8
 - 📰 **Notícias Enviadas** - Total de notícias postadas
 - 📦 **Cache Hits** - Total de hits de cache HTTP
 - 🕐 **Última Varredura** - Timestamp da última varredura
-- ⏳ **Próxima Varredura** - Quando será a próxima (contagem regressiva)
+- ⏳ **Próxima Varredura** - Quando será a próxima (intervalo: 12h)
+- 📋 **Intervalo** - Exibido no rodapé (ex.: 12h)
 
 **Botão Adicional:**
-- 🔄 **Verificar Agora** - Executa varredura manual
+- 🔄 **Verificar Agora** - Executa varredura manual (comando `/now`)
 
 **Resposta:** Embed com todas as estatísticas
+
+---
+
+### `/now`
+
+**Descrição:** Força uma verificação imediata de notícias (atalho para varredura manual).
+
+**Sintaxe:** `/now`
+
+**Resposta:** Confirmação quando a varredura for concluída.
 
 ---
 
@@ -327,16 +326,10 @@ HTML: 8          HTML: 8
    /dashboard
    ```
 
-2. **Configure os Filtros:**
-   - Use o painel do `/dashboard`
-   - Clique nos botões para ativar/desativar categorias
-   - Ou selecione "TUDO" para receber todas as notícias
+2. **Configure o Idioma:**
+   - Use `/setlang idioma:pt_BR` ou `/dashboard` e clique nas bandeiras (🇺🇸 🇧🇷)
 
-3. **Configure o Idioma:**
-   - Use `/setlang idioma:pt_BR`
-   - Ou clique nas bandeiras no dashboard
-
-4. **Verifique se Está Funcionando:**
+3. **Verifique se Está Funcionando:**
    ```
    /forcecheck
    /status
@@ -411,5 +404,5 @@ HTML: 8          HTML: 8
 
 ---
 
-**Última Atualização:** 13 de Fevereiro de 2026  
+**Última Atualização:** 19 de Fevereiro de 2026  
 **Versão do Bot:** 2.1 "v2.1"
