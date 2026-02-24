@@ -140,7 +140,7 @@ docker-compose logs -f
 
 ```
 ✅ Bot conectado como GameBot#1234
-📡 Iniciando loop de varredura (30 min)
+📡 Iniciando loop de varredura (intervalo: 12h / 720 min)
 ```
 
 ---

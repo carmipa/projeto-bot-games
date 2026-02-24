@@ -48,8 +48,6 @@ Discord bot for **game news and trailers**. Monitors releases, DLCs, YouTube tra
 | Log sanitization | Tokens and sensitive data masked in logs |
 | SSL | Verified connections with certifi |
 
-Full details: [SECURITY_GRC_ANALYSIS.md](SECURITY_GRC_ANALYSIS.md)
-
 ---
 
 ## 🚀 Installation

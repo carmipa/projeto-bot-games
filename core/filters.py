@@ -7,15 +7,30 @@ from typing import Dict, Any, List
 
 # Lista de exclusão agressiva: se o título (ou resumo) contiver qualquer termo, descarta e loga "Ruído filtrado"
 LIXO_FILTER = [
+    # eSports / competitivo
     "esports", "e-sports", "tournament", "tournaments", "highlights",
     "championship", "championships", "campeonato", "international championships",
-    "vct", "valorant", "champions tour", "euic", "vgc",  # eSports / competitivo
+    "vct", "valorant", "champions tour", "euic", "vgc",
+
+    # Conteúdo de filmes / featurettes / trailers não-jogos
+    "featurette", "anniversary trailer", "25th anniversary",
+
+    # Conteúdo editorial/opinião/patrocinado
     "review", "reviews", "analise", "análise", "opiniao", "opinião", "opinion",
     "entrevista", "interview", "q&a", "qa", "q and a",
     "podcast", "unboxing",
+    "presented by", "sponsored by", "you decide",
+    "best mobile game of all time", "best game of all time",
+
+    # Guias e walkthroughs
     "guide", "guia", "tips", "how to", "walkthrough", "gameplay walkthrough",
+
+    # Lives e bastidores
     "live stream", "livestream", "streaming",
     "bastidores", "behind the scenes",
+
+    # Outras séries recorrentes de noticiário geral
+    "daily fix", "networking and security",
 ]
 
 # Compatibilidade: NOISE_KEYWORDS = LIXO_FILTER + extras que não estão em LIXO_FILTER

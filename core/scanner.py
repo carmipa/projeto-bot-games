@@ -562,6 +562,21 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                         log.debug(f"🛡️ [Filtro] Ruído filtrado: {title[:50]}...")
                         continue
 
+                    # Regra extra: filtrar YouTube Shorts que não sejam claramente trailers/anúncios de jogos
+                    if "youtube.com/shorts/" in link:
+                        title_lower = (title or "").lower()
+                        allowed_short_kw = (
+                            "trailer",
+                            "announcement",
+                            "reveal",
+                            "launch",
+                            "gameplay trailer",
+                            "official trailer",
+                        )
+                        if not any(kw in title_lower for kw in allowed_short_kw):
+                            log.debug(f"🛡️ [Filtro] YouTube Shorts descartado: {title[:50]}...")
+                            continue
+
                     # GRC: vídeos YouTube com mais de 12 min são descartados (podcasts/entrevistas), exceto Official Gameplay / Reveal
                     if "youtube.com" in link or "youtu.be" in link:
                         duration_sec = get_youtube_duration_seconds(entry)

@@ -48,8 +48,6 @@ Bot de Discord para **notícias e trailers de jogos**. Monitora lançamentos, DL
 | Sanitização de logs | Tokens e dados sensíveis mascarados |
 | SSL | Conexões verificadas com certifi |
 
-Documentação detalhada: [SECURITY_GRC_ANALYSIS.md](SECURITY_GRC_ANALYSIS.md)
-
 ---
 
 ## 🚀 Instalação
