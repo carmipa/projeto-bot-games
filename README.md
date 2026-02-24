@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/icon.svg" alt="GameBot" width="200"/>
+  <img src="icon.png" alt="GameBot" width="200"/>
 </p>
 
 # 🎮 GameBot — Documentação (PT-BR)
