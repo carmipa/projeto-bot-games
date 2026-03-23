@@ -14,6 +14,7 @@ from typing import List, Set, Tuple, Dict, Any
 from urllib.parse import urlparse, urlunparse
 import time
 import os
+import random
 
 # User-Agent de navegador real (evita bloqueio ao resolver canais YouTube @ e em requisições sensíveis)
 BROWSER_USER_AGENT = (
@@ -24,7 +25,7 @@ BROWSER_USER_AGENT = (
 import discord
 from discord.ext import tasks
 
-from settings import LOOP_MINUTES
+from settings import LOOP_MINUTES, BROWSER_USER_AGENTS
 from utils.storage import p, load_json_safe, save_json_safe
 from utils.html import clean_html
 from utils.cache import load_http_state, save_http_state, get_cache_headers, update_cache_state
@@ -354,6 +355,10 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
         return
 
     async with scan_lock:
+        scan_start_time = time.time()
+        # Limite de 125 minutos para que uma varredura não atropele a próxima e evite bloqueios do Discord
+        MAX_SCAN_DURATION = 125 * 60 
+
         log.info(f"🔎 Iniciando varredura de notícias (GameBot)... (trigger={trigger})")
 
         config = load_json_safe(p("config.json"), {})
@@ -404,11 +409,11 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
         # SSL Configuration
         ssl_ctx = ssl.create_default_context(cafile=certifi.where())
         base_headers = {
-            "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+            "User-Agent": BROWSER_USER_AGENT,
             "Accept-Language": "en-US,en;q=0.9",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
         }
-        timeout = aiohttp.ClientTimeout(total=30)
+        timeout = aiohttp.ClientTimeout(total=40) # Aumentado timeout para feeds lentos
         connector = aiohttp.TCPConnector(ssl=ssl_ctx)
 
         sent_count = 0
@@ -433,10 +438,14 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                 if "youtube.com" in url or "youtu.be" in url:
                     await asyncio.sleep(2)
 
-                request_headers = get_cache_headers(url, http_cache)
+                request_headers = {**get_cache_headers(url, http_cache), "User-Agent": random.choice(BROWSER_USER_AGENTS)}
                 last_error: Exception | None = None
 
                 for attempt in range(RSS_MAX_RETRIES):
+                    if (time.time() - scan_start_time) > MAX_SCAN_DURATION:
+                        log.warning(f"🛑 [Timeout Scan-Feed] Cancelando fetch de {url} para não travar o bot.")
+                        return None
+
                     try:
                         async with session.get(url, headers=request_headers) as resp:
                             if resp.status == 304:
@@ -526,6 +535,10 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                 feed_posted_count = 0
                 
                 for entry in entries:
+                    if (time.time() - scan_start_time) > MAX_SCAN_DURATION:
+                         log.warning(f"🛑 [Timeout Scan-Post] Interrompendo processamento de {url} (scan > 125m).")
+                         break
+
                     link = entry.get("link") or "" 
                     if not link: continue
                     
@@ -541,9 +554,9 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                         state["dedup"][url].append(link)
                         continue
 
-                    # Cold Start Limit Check overrules everything
-                    if is_cold_start and feed_posted_count >= 3:
-                         continue
+                    # Cold Start: Respeitando pedido de "sem limitação", removemos a trava rígida de 3 posts.
+                    # O dedup cuidará das duplicatas nas próximas rodadas.
+                    # if is_cold_start and feed_posted_count >= 3: continue # Removido
 
                     # Filtragem por data: nunca publicar notícias com mais de 7 dias (inclui Cold Start)
                     entry_dt = parse_entry_dt(entry)
@@ -690,8 +703,9 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                             sent_count += 1
                             if is_cold_start:
                                 feed_posted_count += 1
-                            # Delay anti-spam (GRC): evita rate limit e detecção de spam pelo Discord
-                            await asyncio.sleep(2)
+                            # Delay anti-spam (GRC-Refined): evita rate limit e detecção de spam pelo Discord
+                            # Aumentado para 2.5s para maior segurança em varreduras longas
+                            await asyncio.sleep(2.5)
 
                         except discord.Forbidden as e:
                             log.error(f"🚫 Sem permissão para enviar mensagem no canal {channel_id} (guild {gid}): {e}")
