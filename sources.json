@@ -20,7 +20,8 @@
     "https://www.giantbomb.com/feeds/mashup/",
     "https://www.gamedeveloper.com/rss.xml",
     "https://indiegamesplus.com/feed",
-    "https://www.escapistmagazine.com/v2/feed/"
+    "https://www.escapistmagazine.com/v2/feed/",
+    "https://www.unrealengine.com/rss"
   ],
   "youtube_feeds": [
     "https://www.youtube.com/@GameTrailers",
@@ -77,11 +78,6 @@
   ],
   "official_sites_reference_(not_rss)": [
     "https://www.nintendo.com/",
-    "https://www.playstation.com/",
-    "https://www.xbox.com/",
-    "https://store.steampowered.com/",
-    "https://www.epicgames.com/",
-    "https://www.unrealengine.com/",
     "https://unity.com/",
 
     "https://www.ea.com/",
@@ -104,7 +100,6 @@
     "https://atlus.com/",
     "https://www.konami.com/",
     "https://www.fromsoftware.jp/",
-    "https://www.koeitecmo.com/",
     "https://www.nisamerica.com/",
 
     "https://www.cdprojekt.com/",
@@ -116,12 +111,7 @@
     "https://www.focus-entmt.com/",
     "https://www.thqnordic.com/",
 
-    "https://www.ign.com/",
-    "https://www.gamespot.com/",
-    "https://www.eurogamer.net/",
-    "https://www.rockpapershotgun.com/",
-    "https://www.gamesindustry.biz/",
-    "https://www.gameinformer.com/"
+    "https://www.ign.com/"
   ],
   "youtube_feed_map": {
     "https://www.youtube.com/@GameTrailers": "https://www.youtube.com/feeds/videos.xml?channel_id=UCJx5KP-pCUmL9eZUv-mIcNw"

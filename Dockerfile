@@ -30,8 +30,13 @@ COPY . .
 # Entrypoint que cria arquivos em DATA_DIR se necessário
 RUN chmod +x /app/entrypoint.sh
 
-# Cria diretório para volume de dados
-RUN mkdir -p /app/data /app/logs
+# Cria usuário não-privilegiado e diretórios necessários com permissões corretas
+RUN groupadd -r gamebot && useradd -r -g gamebot gamebot \
+    && mkdir -p /app/data /app/logs \
+    && chown -R gamebot:gamebot /app
+
+# Altera para o usuário gamebot
+USER gamebot
 
 # Healthcheck: config existe em DATA_DIR ou em /app
 HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=3 \

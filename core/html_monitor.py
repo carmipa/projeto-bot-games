@@ -4,33 +4,17 @@ HTML Monitor - Detects changes in static websites (e.g. game news sites).
 import ssl
 import logging
 import hashlib
-import asyncio
-import httpx
-
+import random
 import certifi
 from typing import List, Dict, Tuple
 from bs4 import BeautifulSoup
+from settings import BROWSER_USER_AGENTS
 
 from utils.storage import p, load_json_safe, save_json_safe
-from utils.security import validate_url
+from utils.security import validate_url, sanitize_log_message
+from utils.http import get_robust_headers
 
 log = logging.getLogger("GameBot")
-
-# Lista rotativa de User-Agents para evitar bloqueios (Rockstar, Activision, etc.)
-ROTATING_USER_AGENTS = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36 Edg/119.0.0.0",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-]
-_ua_index = 0
-
-def _next_user_agent() -> str:
-    global _ua_index
-    ua = ROTATING_USER_AGENTS[_ua_index % len(ROTATING_USER_AGENTS)]
-    _ua_index += 1
-    return ua
 
 # Tags to ignore during hash calculation (noise reduction)
 IGNORE_TAGS = ['script', 'style', 'meta', 'noscript', 'iframe', 'svg']
@@ -46,23 +30,20 @@ async def fetch_page_hash(
 ) -> tuple[str, str, str]:
     """
     Fetches a page, cleans it, and returns (url, title, hash).
-    Usa User-Agent rotativo e exponential backoff em falhas de conexão.
-    Returns (url, "", "") on failure.
-    """
-    ua = use_ua or _next_user_agent()
     last_error: Exception | None = None
     for attempt in range(HTML_FETCH_MAX_RETRIES):
         try:
             # Validação de segurança: anti-SSRF
             is_valid, error_msg = validate_url(url)
             if not is_valid:
-                log.warning(f"🔒 URL bloqueada por segurança no HTML Monitor: {url} - {error_msg}")
+                log.warning(sanitize_log_message(f"🔒 URL bloqueada por segurança no HTML Monitor: {url} - {error_msg}"))
                 return url, "", ""
 
+            headers = get_robust_headers()
             resp = await client.get(
                 url,
                 follow_redirects=True,
-                headers={"User-Agent": ua, "Accept-Language": "en-US,en;q=0.9"},
+                headers=headers,
             )
             if resp.status_code != 200:
                 log.debug(f"HTML Monitor: {url} returned {resp.status_code}")
@@ -98,7 +79,7 @@ async def fetch_page_hash(
                 log.debug(f"HTML Monitor: retry em {delay}s para '{url}' (tentativa {attempt + 1}): {e}")
                 await asyncio.sleep(delay)
             else:
-                log.warning(f"🌐 Erro de conexão no HTML Monitor para '{url}' após {HTML_FETCH_MAX_RETRIES} tentativas: {e}")
+                log.warning(sanitize_log_message(f"🌐 Erro de conexão no HTML Monitor para '{url}' após {HTML_FETCH_MAX_RETRIES} tentativas: {e}"))
                 return url, "", ""
         except Exception as e:
             last_error = e
@@ -107,7 +88,7 @@ async def fetch_page_hash(
                 log.debug(f"HTML Monitor: retry em {delay}s para '{url}' (tentativa {attempt + 1}): {e}")
                 await asyncio.sleep(delay)
             else:
-                log.warning(f"⚠️ Erro inesperado no HTML Monitor para '{url}': {type(e).__name__}: {e}", exc_info=True)
+                log.warning(sanitize_log_message(f"⚠️ Erro inesperado no HTML Monitor para '{url}': {type(e).__name__}: {e}"), exc_info=True)
                 return url, "", ""
 
     return url, "", ""
@@ -153,7 +134,7 @@ async def check_official_sites(
                 rec["last_ts"] = time.time()
                 if rec["count"] >= 3:
                     log.error(
-                        f"🔴 [Source Health] Fonte HTML falhou {rec['count']} vezes: {url} | last_error={rec.get('last_error')}"
+                        sanitize_log_message(f"🔴 [Source Health] Fonte HTML falhou {rec['count']} vezes: {url} | last_error={rec.get('last_error')}")
                     )
                 continue
 

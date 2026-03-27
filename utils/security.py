@@ -32,6 +32,9 @@ BLOCKED_DOMAINS = [
 ALLOWED_SCHEMES = ["http", "https"]
 
 
+import socket
+
+
 def is_private_ip(ip: str) -> bool:
     """
     Verifica se um IP é privado/local.
@@ -55,6 +58,7 @@ def is_private_ip(ip: str) -> bool:
 def validate_url(url: str, allowed_domains: Optional[List[str]] = None) -> Tuple[bool, Optional[str]]:
     """
     Valida uma URL contra ataques SSRF e outros problemas de segurança.
+    Inclui resolução DNS para detectar domínios que apontam para IPs internos.
     
     Args:
         url: URL a validar
@@ -90,18 +94,27 @@ def validate_url(url: str, allowed_domains: Optional[List[str]] = None) -> Tuple
     # Remove porta para validação
     netloc_without_port = parsed.netloc.split(":")[0]
     
-    # Verifica domínios bloqueados
+    # Verifica domínios bloqueados (estático)
     if netloc_without_port.lower() in BLOCKED_DOMAINS:
         return False, f"Domínio '{netloc_without_port}' não permitido (domínio local)"
     
-    # Verifica se é IP privado
+    # Validação de IP Resolved (Anti-SSRF via DNS Rebinding/Localhost aliases)
     try:
-        if is_private_ip(netloc_without_port):
-            return False, f"IP privado/local '{netloc_without_port}' não permitido (anti-SSRF)"
-    except ValueError:
-        # Não é um IP válido, pode ser um domínio
+        # Resolve o endereço para verificar o IP real por trás do domínio
+        addr_info = socket.getaddrinfo(netloc_without_port, None)
+        for item in addr_info:
+            resolved_ip = item[4][0]
+            if is_private_ip(resolved_ip):
+                return False, f"O endereço '{netloc_without_port}' resolve para um IP privado ({resolved_ip}) e não é permitido."
+    except socket.gaierror:
+        # Se não resolver, pode ser um domínio inválido ou problemas de rede.
+        # Permitimos passar aqui pois a biblioteca HTTP (aiohttp/httpx) falhará na conexão.
         pass
-    
+    except Exception as e:
+        log.debug(f"Erro na resolução DNS para validação SSRF: {e}")
+        # Em caso de erro bizarro na resolução, bloqueamos por segurança
+        return False, "Erro ao validar o endereço (resolução DNS falhou)"
+
     # Se há whitelist de domínios, valida contra ela
     if allowed_domains:
         domain_match = False

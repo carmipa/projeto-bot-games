@@ -16,11 +16,7 @@ import time
 import os
 import random
 
-# User-Agent de navegador real (evita bloqueio ao resolver canais YouTube @ e em requisições sensíveis)
-BROWSER_USER_AGENT = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
-    "Chrome/120.0.0.0 Safari/537.36"
-)
+# User-Agent de navegador real é obtido via utils.http.get_robust_headers()
 
 import discord
 from discord.ext import tasks
@@ -30,7 +26,8 @@ from utils.storage import p, load_json_safe, save_json_safe
 from utils.html import clean_html
 from utils.cache import load_http_state, save_http_state, get_cache_headers, update_cache_state
 from utils.translator import translate_to_target, t
-from utils.security import validate_url
+from utils.security import validate_url, sanitize_log_message
+from utils.http import get_robust_headers
 from core.stats import stats
 from core.filters import should_post_to_guild, should_skip_by_content
 from core.html_monitor import check_official_sites
@@ -176,7 +173,7 @@ async def _fetch_youtube_channel_id_from_page(
 ) -> str:
     """Faz GET na página do canal e extrai channelId do código fonte (fallback quando não está no mapa)."""
     try:
-        headers = {"User-Agent": BROWSER_USER_AGENT, "Accept-Language": "en-US,en;q=0.9"}
+        headers = get_robust_headers() # Simula navegador real
         async with session.get(url, headers=headers, timeout=timeout) as resp:
             if resp.status != 200:
                 log.debug(f"YouTube resolve: {url} retornou {resp.status}. Mantendo URL original.")
@@ -432,13 +429,13 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                 # Validação de segurança: anti-SSRF
                 is_valid, error_msg = validate_url(url)
                 if not is_valid:
-                    log.warning(f"🔒 URL bloqueada por segurança: {url} - {error_msg}")
+                    log.warning(sanitize_log_message(f"🔒 URL bloqueada por segurança: {url} - {error_msg}"))
                     return None
 
                 if "youtube.com" in url or "youtu.be" in url:
                     await asyncio.sleep(2)
 
-                request_headers = {**get_cache_headers(url, http_cache), "User-Agent": random.choice(BROWSER_USER_AGENTS)}
+                request_headers = {**get_cache_headers(url, http_cache), **get_robust_headers()}
                 last_error: Exception | None = None
 
                 for attempt in range(RSS_MAX_RETRIES):
@@ -485,7 +482,7 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                             rec["count"] = rec.get("count", 0) + 1
                             rec["last_error"] = str(e)
                             rec["last_ts"] = time.time()
-                            log.error(f"❌ Erro de conexão ao baixar feed '{url}' após {RSS_MAX_RETRIES} tentativas: {e}")
+                            log.error(sanitize_log_message(f"❌ Erro de conexão ao baixar feed '{url}' após {RSS_MAX_RETRIES} tentativas: {e}"))
                             if rec["count"] >= 3:
                                 log.error(
                                     f"🔴 [Source Health] Fonte RSS falhou {rec['count']} vezes: {url} | "
@@ -503,7 +500,7 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                             rec["count"] = rec.get("count", 0) + 1
                             rec["last_error"] = f"{type(e).__name__}: {e}"
                             rec["last_ts"] = time.time()
-                            log.error(f"❌ Falha inesperada ao processar feed '{url}': {type(e).__name__}: {e}", exc_info=True)
+                            log.error(sanitize_log_message(f"❌ Falha inesperada ao processar feed '{url}': {type(e).__name__}: {e}"), exc_info=True)
                             if rec["count"] >= 3:
                                 log.error(
                                     f"🔴 [Source Health] Fonte RSS falhou {rec['count']} vezes: {url} | "

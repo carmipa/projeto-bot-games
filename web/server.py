@@ -117,6 +117,7 @@ def security_headers_middleware(handler):
 
 @routes.get('/')
 @rate_limit_middleware
+@auth_required
 @security_headers_middleware
 async def index(request):
     """Renderiza a página inicial."""
