@@ -649,10 +649,14 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                             if embed_ts.tzinfo is None:
                                 embed_ts = embed_ts.replace(tzinfo=timezone.utc)
 
+                            # Data string para exibição
+                            str_date = pub_dt.strftime("%d/%m/%Y %H:%M") if pub_dt else datetime.now().strftime("%d/%m/%Y %H:%M")
+                            postado_str = f"🕒 **Postado em:** {str_date}"
+
                             # Embed para notícias
                             embed = discord.Embed(
                                 title=t_translated[:256],
-                                description=s_translated,
+                                description=f"{s_translated}\n\n{postado_str}",
                                 url=link,
                                 color=embed_color,
                                 timestamp=embed_ts
@@ -684,13 +688,26 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                             # Se for mídia, mandamos o LINK no content para o Discord gerar o player nativo
                             # E NÃO mandamos o embed, pois o Discord prioriza o embed sobre o player
                             if is_media:
-                                msg_content = f"📺 **{t_translated}**\n{link}"
+                                msg_content = f"📺 **{t_translated}**\n{link}\n\n{postado_str}"
                                 embed_to_send = None
                             else:
                                 msg_content = None
                                 embed_to_send = embed
                             
-                            await channel.send(content=msg_content, embed=embed_to_send)
+                            # Criar View com botões de compartilhamento
+                            from urllib.parse import quote
+                            view = discord.ui.View(timeout=None)
+                            
+                            view.add_item(discord.ui.Button(label="Leia Mais", url=link, emoji="📖", style=discord.ButtonStyle.link))
+                            
+                            wa_text = quote(f"{t_translated}\n\n{link}")
+                            view.add_item(discord.ui.Button(label="WhatsApp", url=f"https://api.whatsapp.com/send?text={wa_text}", emoji="🟢", style=discord.ButtonStyle.link))
+                            
+                            email_subj = quote(t_translated)
+                            email_body = quote(f"Confira esta notícia:\n\n{link}")
+                            view.add_item(discord.ui.Button(label="E-mail", url=f"mailto:?subject={email_subj}&body={email_body}", emoji="✉️", style=discord.ButtonStyle.link))
+                            
+                            await channel.send(content=msg_content, embed=embed_to_send, view=view)
 
                             posted_anywhere = True
                             sent_count += 1
@@ -754,7 +771,18 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
 
                         if channel:
                             try:
-                                await channel.send(f"⚠️ **GameBot — Alerta**\n{u_title}\n{u_link}")
+                                from urllib.parse import quote
+                                view = discord.ui.View(timeout=None)
+                                view.add_item(discord.ui.Button(label="Leia Mais", url=u_link, emoji="📖", style=discord.ButtonStyle.link))
+                                wa_text = quote(f"{u_title}\n\n{u_link}")
+                                view.add_item(discord.ui.Button(label="WhatsApp", url=f"https://api.whatsapp.com/send?text={wa_text}", emoji="🟢", style=discord.ButtonStyle.link))
+                                email_subj = quote(u_title)
+                                email_body = quote(f"Confira esta notícia:\n\n{u_link}")
+                                view.add_item(discord.ui.Button(label="E-mail", url=f"mailto:?subject={email_subj}&body={email_body}", emoji="✉️", style=discord.ButtonStyle.link))
+                                
+                                str_date = datetime.now().strftime("%d/%m/%Y %H:%M")
+                                post_text = f"🕒 **Postado em:** {str_date}"
+                                await channel.send(f"⚠️ **GameBot — Alerta**\n{u_title}\n{u_link}\n\n{post_text}", view=view)
                                 sent_count += 1
                             except discord.Forbidden:
                                 log.error(
