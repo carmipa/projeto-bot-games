@@ -13,9 +13,10 @@ ENV PYTHONUNBUFFERED=1 \
 # Diretório de trabalho
 WORKDIR /app
 
-# Instala dependências do sistema (necessárias para certifi e SSL)
+# Instala dependências do sistema + gosu (entrypoint roda como root, ajusta volumes e desce para gamebot)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
+    gosu \
     && rm -rf /var/lib/apt/lists/*
 
 # Copia requirements primeiro (melhor cache de layers)
@@ -35,8 +36,8 @@ RUN groupadd -r gamebot && useradd -r -g gamebot gamebot \
     && mkdir -p /app/data /app/logs \
     && chown -R gamebot:gamebot /app
 
-# Altera para o usuário gamebot
-USER gamebot
+# NÃO use USER aqui: o entrypoint precisa ser root para chown em volumes montados (./logs, ./data),
+# depois executa o Python com gosu como gamebot.
 
 # Healthcheck: config existe em DATA_DIR ou em /app
 HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=3 \

@@ -102,21 +102,31 @@ def setup_logger(name="GameBot", log_file="logs/bot.log", level=logging.INFO):
     # --- File Handler (Sem cores ANSI, formato padrão) ---
     from logging.handlers import RotatingFileHandler
     import os
-    
-    os.makedirs(os.path.dirname(log_file), exist_ok=True)
-    
-    file_handler = RotatingFileHandler(
-        log_file, 
-        maxBytes=5*1024*1024, # 5MB
-        backupCount=3, 
-        encoding="utf-8"
-    )
-    # Formato limpo para arquivo
-    file_fmt = logging.Formatter("%(asctime)s - [%(levelname)s] - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
-    file_handler.setFormatter(file_fmt)
-    # Adiciona filtro de segurança para sanitizar logs
-    file_handler.addFilter(SecurityFilter())
-    logger.addHandler(file_handler)
+
+    log_dir = os.path.dirname(log_file)
+    if log_dir:
+        os.makedirs(log_dir, exist_ok=True)
+
+    try:
+        file_handler = RotatingFileHandler(
+            log_file,
+            maxBytes=5 * 1024 * 1024,  # 5MB
+            backupCount=3,
+            encoding="utf-8",
+        )
+        file_fmt = logging.Formatter(
+            "%(asctime)s - [%(levelname)s] - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+        )
+        file_handler.setFormatter(file_fmt)
+        file_handler.addFilter(SecurityFilter())
+        logger.addHandler(file_handler)
+    except OSError as e:
+        # Docker: volume ./logs montado como root sem chown no entrypoint, etc.
+        print(
+            f"[GameBot] Aviso: não foi possível abrir log em arquivo ({log_file}): {e}. "
+            "Usando apenas console.",
+            file=sys.stderr,
+        )
 
     # --- Console Handler (Com cores) ---
     console_handler = logging.StreamHandler(sys.stdout)
