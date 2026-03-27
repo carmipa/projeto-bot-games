@@ -23,8 +23,7 @@
     "https://www.escapistmagazine.com/v2/feed/"
   ],
   "youtube_feeds": [
-    "https://www.youtube.com/feeds/videos.xml?channel_id=UCJx5KP-pCUmL9eZUv-mIcNw",
-    "https://www.youtube.com/feeds/videos.xml?channel_id=UCKy1dAqELo0zrOtPkf0eTMw",
+    "https://www.youtube.com/@GameTrailers",
     "https://www.youtube.com/feeds/videos.xml?channel_id=UCKy1dAqELo0zrOtPkf0eTMw",
 
     "https://www.youtube.com/feeds/videos.xml?channel_id=UC-2Y8dQb0S6DtDX7KGIdYcA",
@@ -44,7 +43,6 @@
     "https://www.youtube.com/feeds/videos.xml?channel_id=UC9YPX97Xid-eun0AosSdvMA",
     "https://www.youtube.com/@2K",
     "https://www.youtube.com/@TakeTwoGames",
-    "https://www.youtube.com/feeds/videos.xml?channel_id=UCKy1dAqELo0zrOtPkf0eTMw",
     "https://www.youtube.com/@Blizzard",
     "https://www.youtube.com/feeds/videos.xml?channel_id=UCZ6Xy6id-X-D_O4R_K-vQ0A",
     "https://www.youtube.com/@RiotGames",
@@ -64,7 +62,6 @@
 
     "https://www.youtube.com/feeds/videos.xml?channel_id=UCG_id_NAsNIDR9_g62K_Ppw",
     "https://www.youtube.com/@ParadoxInteractive",
-    "https://www.youtube.com/feeds/videos.xml?channel_id=UC_pY5W9uYf_m3K8P6e0U4oQ",
     "https://www.youtube.com/@AnnapurnaInteractive",
     "https://www.youtube.com/@Team17",
     "https://www.youtube.com/feeds/videos.xml?channel_id=UCaLdl0827np4QVPESo794og",
@@ -75,10 +72,8 @@
     "https://www.youtube.com/@gamescom",
     "https://www.youtube.com/@TokyoGameShow",
 
-    "https://www.youtube.com/feeds/videos.xml?channel_id=UC9YPX97Xid-eun0AosSdvMA",
     "https://www.youtube.com/feeds/videos.xml?channel_id=UC52D26Kq7B9q8vN7M_r-0qg",
-    "https://www.youtube.com/@MechaBREAK",
-    "https://www.youtube.com/feeds/videos.xml?channel_id=UCJx5KP-pCUmL9eZUv-mIcNw"
+    "https://www.youtube.com/@MechaBREAK"
   ],
   "official_sites_reference_(not_rss)": [
     "https://www.nintendo.com/",
@@ -128,5 +123,7 @@
     "https://www.gamesindustry.biz/",
     "https://www.gameinformer.com/"
   ],
-  "youtube_feed_map": {}
+  "youtube_feed_map": {
+    "https://www.youtube.com/@GameTrailers": "https://www.youtube.com/feeds/videos.xml?channel_id=UCJx5KP-pCUmL9eZUv-mIcNw"
+  }
 }
