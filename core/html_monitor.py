@@ -6,6 +6,8 @@ import logging
 import hashlib
 import random
 import certifi
+import httpx
+import asyncio
 from typing import List, Dict, Tuple
 from bs4 import BeautifulSoup
 from settings import BROWSER_USER_AGENTS
