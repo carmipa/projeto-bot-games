@@ -18,7 +18,7 @@ def get_robust_headers() -> Dict[str, str]:
     return {
         "User-Agent": ua,
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Language": "en-US,en;q=0.9,pt-BR;q=0.8",
         "Accept-Encoding": "gzip, deflate, br",
         "Referer": random.choice(referers),
         "DNT": "1",
@@ -28,5 +28,8 @@ def get_robust_headers() -> Dict[str, str]:
         "Sec-Fetch-Mode": "navigate",
         "Sec-Fetch-Site": "cross-site",
         "Sec-Fetch-User": "?1",
+        "Sec-Ch-Ua": '"Not A(Brand";v="99", "Google Chrome";v="121", "Chromium";v="121"',
+        "Sec-Ch-Ua-Mobile": "?0",
+        "Sec-Ch-Ua-Platform": '"Windows"',
         "Cache-Control": "max-age=0"
     }

@@ -112,10 +112,7 @@ async def check_official_sites(
     if not urls:
         return [], current_state
 
-    headers = {
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-    }
+    headers = get_robust_headers()
 
     updates = []
     new_state = current_state.copy()
