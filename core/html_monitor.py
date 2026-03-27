@@ -30,6 +30,7 @@ async def fetch_page_hash(
 ) -> tuple[str, str, str]:
     """
     Fetches a page, cleans it, and returns (url, title, hash).
+    """
     last_error: Exception | None = None
     for attempt in range(HTML_FETCH_MAX_RETRIES):
         try:
