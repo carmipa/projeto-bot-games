@@ -21,7 +21,7 @@ log = logging.getLogger("GameBot")
 # Tags to ignore during hash calculation (noise reduction)
 IGNORE_TAGS = ['script', 'style', 'meta', 'noscript', 'iframe', 'svg']
 # Classes/IDs often used for ads or dynamic widgets
-IGNORE_SELECTORS = ['.ad', '.advertisement', '.widget', '#clock', '.timestamp', '.cookie-consent']
+IGNORE_SELECTORS = ['.ad', '.advertisement', '.widget', '.cookie-consent']
 
 # Exponential backoff: delays em segundos (tentativa 1, 2, 3)
 HTML_FETCH_BACKOFF = [1, 2, 4]

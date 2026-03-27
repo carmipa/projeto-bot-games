@@ -31,6 +31,12 @@ from utils.http import get_robust_headers
 from core.stats import stats
 from core.filters import should_post_to_guild, should_skip_by_content
 from core.html_monitor import check_official_sites
+from utils.discord_link_buttons import (
+    LINK_BUTTON_URL_MAX,
+    gmail_compose_button_url,
+    safe_https_button_url,
+    whatsapp_share_button_url,
+)
 
 log = logging.getLogger("GameBot")
 
@@ -694,19 +700,35 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                                 msg_content = None
                                 embed_to_send = embed
                             
-                            # Criar View com botões de compartilhamento
-                            from urllib.parse import quote
+                            # Botões de link: só http(s) — Discord rejeita mailto: e URLs > 512 chars
                             view = discord.ui.View(timeout=None)
-                            
-                            view.add_item(discord.ui.Button(label="Leia Mais", url=link, emoji="📖", style=discord.ButtonStyle.link))
-                            
-                            wa_text = quote(f"{t_translated}\n\n{link}")
-                            view.add_item(discord.ui.Button(label="WhatsApp", url=f"https://api.whatsapp.com/send?text={wa_text}", emoji="🟢", style=discord.ButtonStyle.link))
-                            
-                            email_subj = quote(t_translated)
-                            email_body = quote(f"Confira esta notícia:\n\n{link}")
-                            view.add_item(discord.ui.Button(label="E-mail", url=f"mailto:?subject={email_subj}&body={email_body}", emoji="✉️", style=discord.ButtonStyle.link))
-                            
+                            read_url = safe_https_button_url(link)
+                            if read_url:
+                                view.add_item(
+                                    discord.ui.Button(
+                                        label="Leia Mais",
+                                        url=read_url,
+                                        emoji="📖",
+                                        style=discord.ButtonStyle.link,
+                                    )
+                                )
+                            view.add_item(
+                                discord.ui.Button(
+                                    label="WhatsApp",
+                                    url=whatsapp_share_button_url(t_translated, link),
+                                    emoji="🟢",
+                                    style=discord.ButtonStyle.link,
+                                )
+                            )
+                            view.add_item(
+                                discord.ui.Button(
+                                    label="E-mail",
+                                    url=gmail_compose_button_url(t_translated, link),
+                                    emoji="✉️",
+                                    style=discord.ButtonStyle.link,
+                                )
+                            )
+
                             await channel.send(content=msg_content, embed=embed_to_send, view=view)
 
                             posted_anywhere = True
@@ -771,15 +793,42 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
 
                         if channel:
                             try:
-                                from urllib.parse import quote
                                 view = discord.ui.View(timeout=None)
-                                view.add_item(discord.ui.Button(label="Leia Mais", url=u_link, emoji="📖", style=discord.ButtonStyle.link))
-                                wa_text = quote(f"{u_title}\n\n{u_link}")
-                                view.add_item(discord.ui.Button(label="WhatsApp", url=f"https://api.whatsapp.com/send?text={wa_text}", emoji="🟢", style=discord.ButtonStyle.link))
-                                email_subj = quote(u_title)
-                                email_body = quote(f"Confira esta notícia:\n\n{u_link}")
-                                view.add_item(discord.ui.Button(label="E-mail", url=f"mailto:?subject={email_subj}&body={email_body}", emoji="✉️", style=discord.ButtonStyle.link))
-                                
+                                html_read = safe_https_button_url(u_link)
+                                if html_read:
+                                    view.add_item(
+                                        discord.ui.Button(
+                                            label="Leia Mais",
+                                            url=html_read,
+                                            emoji="📖",
+                                            style=discord.ButtonStyle.link,
+                                        )
+                                    )
+                                ul = str(u_link or "").strip()
+                                share_link = html_read or (
+                                    ul[:LINK_BUTTON_URL_MAX]
+                                    if ul.startswith(("http://", "https://"))
+                                    else ""
+                                )
+                                if not share_link:
+                                    share_link = "https://mail.google.com/mail/"
+                                view.add_item(
+                                    discord.ui.Button(
+                                        label="WhatsApp",
+                                        url=whatsapp_share_button_url(u_title, share_link),
+                                        emoji="🟢",
+                                        style=discord.ButtonStyle.link,
+                                    )
+                                )
+                                view.add_item(
+                                    discord.ui.Button(
+                                        label="E-mail",
+                                        url=gmail_compose_button_url(u_title, share_link),
+                                        emoji="✉️",
+                                        style=discord.ButtonStyle.link,
+                                    )
+                                )
+
                                 str_date = datetime.now().strftime("%d/%m/%Y %H:%M")
                                 post_text = f"🕒 **Postado em:** {str_date}"
                                 await channel.send(f"⚠️ **GameBot — Alerta**\n{u_title}\n{u_link}\n\n{post_text}", view=view)
