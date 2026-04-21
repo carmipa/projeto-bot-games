@@ -29,6 +29,13 @@ services:
         max-size: "10m"
         max-file: "3"
 
+    # Hardening de recursos (protege contra consumo excessivo de CPU/RAM)
+    deploy:
+      resources:
+        limits:
+          cpus: "0.80"
+          memory: 512M
+
     # Política de restart
     # unless-stopped: reinicia sempre, exceto se parado manualmente
 
