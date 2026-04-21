@@ -365,6 +365,12 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
         log.info(f"🔎 Iniciando varredura de notícias (GameBot)... (trigger={trigger})")
 
         config = load_json_safe(p("config.json"), {})
+        # Mapa em memória de idioma por guild para evitar leitura repetida de config no hot path
+        guild_lang_map: Dict[str, str] = {
+            str(gid): str(gdata.get("language"))
+            for gid, gdata in config.items()
+            if isinstance(gdata, dict) and gdata.get("language")
+        }
         
         # Verifica se há guilds configuradas
         if not config or not any(isinstance(v, dict) and v.get("channel_id") for v in config.values()):
@@ -464,7 +470,8 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                         loop = asyncio.get_running_loop()
                         feed = await loop.run_in_executor(None, lambda: feedparser.parse(text))
 
-                        entries = getattr(feed, "entries", []) or []
+                        # Limita processamento por feed para reduzir custo em canais muito ativos
+                        entries = (getattr(feed, "entries", []) or [])[:10]
 
                         if not entries and resp.status == 200:
                             log.warning(f"⚠️ Feed retornou 200 OK mas 0 entradas: {url}")
@@ -599,6 +606,10 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                                 continue
 
                     posted_anywhere = False
+                    t_clean = clean_html(title).strip()
+                    s_clean = clean_html(summary).strip()[:2000]
+                    # Cache de tradução por idioma para esta notícia (título + resumo)
+                    translations_by_lang: Dict[str, Tuple[str, str]] = {}
 
                     # Verifica cada guild
                     for gid, gdata in config.items():
@@ -619,16 +630,14 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                             log.warning(f"Canal {channel_id} não encontrado.")
                             continue
 
-                        t_clean = clean_html(title).strip()
-                        s_clean = clean_html(summary).strip()[:2000]
-
                         # Tradução
-                        target_lang = "en_US"
-                        if str(gid) in config and "language" in config[str(gid)]:
-                            target_lang = config[str(gid)]["language"]
-                        
-                        t_translated = await translate_to_target(t_clean, target_lang)
-                        s_translated = await translate_to_target(s_clean, target_lang)
+                        target_lang = t.detect_lang(str(gid), guild_lang_map=guild_lang_map)
+                        if target_lang not in translations_by_lang:
+                            t_translated = await translate_to_target(t_clean, target_lang)
+                            s_translated = await translate_to_target(s_clean, target_lang)
+                            translations_by_lang[target_lang] = (t_translated, s_translated)
+                        else:
+                            t_translated, s_translated = translations_by_lang[target_lang]
 
                         # Detecção de Leaks/Rumores (Refined Logic via Helper)
                         prefix, embed_color = get_news_metadata(t_clean, link)
