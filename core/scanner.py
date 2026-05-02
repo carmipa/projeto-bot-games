@@ -656,7 +656,6 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                             log.debug(f"Erro ao verificar domínio de mídia para '{link[:50]}...': {e}")
 
                         try:
-                            from utils.translator import t
                             # Data/hora oficial da matéria ou vídeo (quando o feed fornece)
                             pub_dt = entry_dt if entry_dt else None
                             embed_ts = pub_dt if pub_dt else datetime.now()
