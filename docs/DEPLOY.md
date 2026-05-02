@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/icon.png" alt="GameBot" width="200"/>
+  <img src="../assets/icon.png" alt="GameBot" width="200"/>
 </p>
 
 <h1 align="center">🐳 Guia de Deploy — GameBot</h1>
@@ -94,7 +94,7 @@ DISCORD_TOKEN=seu_token_discord_aqui
 
 # ⚙️ OPCIONAL (valores padrão)
 COMMAND_PREFIX=!
-LOOP_MINUTES=720
+LOOP_MINUTES=1440
 ```
 
 **Dica:** Obtenha seu token em <https://discord.com/developers/applications>
@@ -140,7 +140,7 @@ docker-compose logs -f
 
 ```
 ✅ Bot conectado como GameBot#1234
-📡 Iniciando loop de varredura (intervalo: 12h / 720 min)
+📡 Iniciando loop de varredura (intervalo: 24h / 1440 min)
 ```
 
 ---
@@ -435,9 +435,9 @@ O bot usa o diretório **`./data`** para persistir configuração e estado (evit
 │   ├── history.json            # Links já enviados
 │   └── sources.json            # Feeds RSS (cópia na 1ª execução)
 ├── logs/                       # Logs do bot
-├── 🐳 Docker
+├── docker-compose.yml          # Na raiz: aponta build para deploy/Dockerfile
+├── deploy/
 │   ├── Dockerfile
-│   ├── docker-compose.yml
 │   └── entrypoint.sh           # Cria arquivos em data/ se necessário
 │
 ├── 🤖 Bot

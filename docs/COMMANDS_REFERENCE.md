@@ -108,7 +108,7 @@
 **Uso:**
 - Útil para testar se o bot está funcionando
 - Quando você sabe que saiu uma notícia urgente
-- Não quer esperar o ciclo automático (padrão: 12h)
+- Não quer esperar o ciclo automático (padrão: 24h)
 
 **Resposta:**
 - ✅ Confirmação quando varredura concluída
@@ -221,8 +221,8 @@ HTML: 8          HTML: 8
 - 📰 **Notícias Enviadas** - Total de notícias postadas
 - 📦 **Cache Hits** - Total de hits de cache HTTP
 - 🕐 **Última Varredura** - Timestamp da última varredura
-- ⏳ **Próxima Varredura** - Quando será a próxima (intervalo: 12h)
-- 📋 **Intervalo** - Exibido no rodapé (ex.: 12h)
+- ⏳ **Próxima Varredura** - Quando será a próxima (intervalo: 24h)
+- 📋 **Intervalo** - Exibido no rodapé (ex.: 24h)
 
 **Botão Adicional:**
 - 🔄 **Verificar Agora** - Executa varredura manual (comando `/now`)

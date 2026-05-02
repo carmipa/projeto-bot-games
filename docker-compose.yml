@@ -1,6 +1,8 @@
 services:
   bot:
-    build: .
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
     container_name: projeto-bot-games
     restart: unless-stopped
     tty: true

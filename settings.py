@@ -9,11 +9,11 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 
 # Operação (opcional via env)
 COMMAND_PREFIX = os.getenv("COMMAND_PREFIX", "!")
-# Intervalo do scanner: 12 em 12 horas (720 minutos)
+# Intervalo do scanner: 24 em 24 horas (1440 minutos)
 try:
-    LOOP_MINUTES = int(os.getenv("LOOP_MINUTES", "720"))
+    LOOP_MINUTES = int(os.getenv("LOOP_MINUTES", "1440"))
 except ValueError:
-    LOOP_MINUTES = 720
+    LOOP_MINUTES = 1440
 
 # Logging Level (INFO, DEBUG, WARNING, ERROR)
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()

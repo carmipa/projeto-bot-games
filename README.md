@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="icon.png" alt="GameBot" width="200"/>
+  <img src="assets/icon.png" alt="GameBot" width="200"/>
 </p>
 
 # 🎮 GameBot — Documentação (PT-BR)
@@ -89,7 +89,7 @@ docker-compose up -d
 docker-compose logs -f
 ```
 
-Guia completo: [DEPLOY.md](DEPLOY.md)
+Guia completo: [docs/DEPLOY.md](docs/DEPLOY.md)
 
 ---
 
@@ -101,7 +101,7 @@ Guia completo: [DEPLOY.md](DEPLOY.md)
 |----------|-------------|-----------|
 | `DISCORD_TOKEN` | ✅ | Token do bot do Discord |
 | `COMMAND_PREFIX` | ❌ | Prefixo de comandos (padrão: `!`) |
-| `LOOP_MINUTES` | ❌ | Intervalo do scanner em minutos (padrão: 720 = 12h) |
+| `LOOP_MINUTES` | ❌ | Intervalo do scanner em minutos (padrão: 1440 = 24h) |
 | `LOG_LEVEL` | ❌ | DEBUG, INFO, WARNING, ERROR |
 | `WEB_AUTH_TOKEN` | ❌ | Token do dashboard web (recomendado em produção) |
 | `WEB_HOST` | ❌ | Ex.: 127.0.0.1 ou 0.0.0.0 |
@@ -153,7 +153,7 @@ Guia completo: [DEPLOY.md](DEPLOY.md)
 
 **Tipos do `/clean_state`:** `dedup` (histórico), `http_cache`, `html_hashes`, `tudo`. Sempre é feito backup antes da limpeza.
 
-Referência completa: [COMMANDS_REFERENCE.md](../COMMANDS_REFERENCE.md) | Lista rápida: [COMANDOS.md](../COMANDOS.md)
+Referência completa: [docs/COMMANDS_REFERENCE.md](docs/COMMANDS_REFERENCE.md) | Lista rápida: [docs/COMANDOS.md](docs/COMANDOS.md) | [Changelog](docs/CHANGELOG.md)
 
 ---
 
@@ -203,7 +203,7 @@ Substitua pelos feeds de notícias e canais de jogos que desejar monitorar.
 
 - **Local:** `python main.py`
 - **Docker:** `docker-compose up -d`
-- **systemd:** Ver [DEPLOY.md](DEPLOY.md) para serviço em Linux.
+- **systemd:** Ver [docs/DEPLOY.md](docs/DEPLOY.md) para serviço em Linux.
 
 Volumes recomendados para persistência: `config.json`, `state.json`, `history.json`, `sources.json`, `logs/`.
 
@@ -227,8 +227,11 @@ projeto-bot-games/
 ├── utils/               # Logger, storage, security, translator
 ├── web/                 # Servidor do dashboard
 ├── translations/        # PT-BR e EN
-├── docs/                # Documentação
-└── logs/                # Logs do bot
+├── deploy/              # Dockerfile e entrypoint do container
+├── assets/              # Ícone / marca (ex.: icon.png para o README)
+├── docs/                # Documentação (deploy, comandos, changelog, EN)
+├── scripts/             # Utilitários opcionais (fontes / checagens)
+└── tests/               # Testes pytest
 ```
 
 ---

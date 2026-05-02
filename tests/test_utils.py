@@ -74,7 +74,7 @@ def test_sources_urls_are_valid():
 def test_readme_exists():
     """Smoke test: verifica que README existe."""
     import os
-    assert os.path.exists("README.md") or os.path.exists("readme.md") or os.path.exists("docs/readme.md"), (
-        "README.md, readme.md ou docs/readme.md deve existir"
+    assert os.path.exists("README.md") or os.path.exists("readme.md") or os.path.exists("docs/README.md"), (
+        "README.md na raiz ou docs/README.md deve existir"
     )
 

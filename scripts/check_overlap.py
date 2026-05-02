@@ -1,6 +1,10 @@
 import json
+import os
 
-with open('g:/PROJETOS-OPEN/projeto-bot-games/projeto-bot-games/sources.json', 'r', encoding='utf-8') as f:
+_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+_SOURCES = os.path.join(_ROOT, "sources.json")
+
+with open(_SOURCES, "r", encoding="utf-8") as f:
     data = json.load(f)
 
 rss_domains = set()

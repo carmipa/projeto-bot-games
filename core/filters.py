@@ -7,6 +7,9 @@ from typing import Dict, Any, List
 
 # Lista de exclusão agressiva: se o título (ou resumo) contiver qualquer termo, descarta e loga "Ruído filtrado"
 LIXO_FILTER = [
+    # Franquia excluída do escopo do bot (jogos / mídia)
+    "gundam",
+
     # eSports / competitivo
     "esports", "e-sports", "tournament", "tournaments", "highlights",
     "championship", "championships", "campeonato", "international championships",

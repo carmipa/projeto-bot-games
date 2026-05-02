@@ -1,15 +1,17 @@
 """
-Legacy script: example for adding URLs to sources.json.
-Current game feeds are in sources.json. This file kept for reference.
+Script legado de exemplo para adicionar URLs a sources.json.
+Executar a partir da raiz: python scripts/add_sources_script.py
 """
 import json
+import os
 import asyncio
 import httpx
 import re
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qs
 
-SOURCES_FILE = "sources.json"
+_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+SOURCES_FILE = os.path.join(_ROOT, "sources.json")
 NEW_URLS = [
     "https://p-bandai.com/us/",
     "https://blog.playstation.com/feed/",

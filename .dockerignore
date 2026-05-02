@@ -49,11 +49,9 @@ tests/
 .github/
 .gitlab-ci.yml
 
-# Docker
-Dockerfile
+# Docker (não excluir deploy/Dockerfile do contexto)
 docker-compose.yml
 .dockerignore
 
 # Outros
-icon.png
 LICENSE

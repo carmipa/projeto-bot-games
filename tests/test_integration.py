@@ -63,14 +63,23 @@ def test_integration_stats_module():
 
 # ============== Integração: Web (app + rotas) ==============
 
-def test_integration_web_index_returns_200():
+def _web_routes_without_auth(monkeypatch):
+    """Recarrega web.server sem WEB_AUTH_TOKEN (evita 401 quando .env define token)."""
+    import importlib
+    monkeypatch.delenv("WEB_AUTH_TOKEN", raising=False)
+    import web.server as ws
+    importlib.reload(ws)
+    return ws.routes
+
+
+def test_integration_web_index_returns_200(monkeypatch):
     """Servidor web: GET / retorna 200 e HTML."""
     from aiohttp import web
     from aiohttp.test_utils import TestClient, TestServer
     import aiohttp_jinja2
     import jinja2
 
-    from web.server import routes
+    routes = _web_routes_without_auth(monkeypatch)
     from utils.storage import p
 
     app = web.Application()
@@ -88,14 +97,14 @@ def test_integration_web_index_returns_200():
     asyncio.run(_run())
 
 
-def test_integration_web_api_stats_structure():
+def test_integration_web_api_stats_structure(monkeypatch):
     """Servidor web: GET /api/stats retorna JSON com campos esperados (sem auth)."""
     from aiohttp import web
     from aiohttp.test_utils import TestClient, TestServer
     import aiohttp_jinja2
     import jinja2
 
-    from web.server import routes
+    routes = _web_routes_without_auth(monkeypatch)
     from utils.storage import p
 
     app = web.Application()

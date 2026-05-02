@@ -97,7 +97,7 @@ Full guide: [DEPLOY.md](DEPLOY.md)
 |----------|----------|-------------|
 | `DISCORD_TOKEN` | ✅ | Discord bot token |
 | `COMMAND_PREFIX` | ❌ | Command prefix (default: `!`) |
-| `LOOP_MINUTES` | ❌ | Scanner interval in minutes (default: 720 = 12h) |
+| `LOOP_MINUTES` | ❌ | Scanner interval in minutes (default: 1440 = 24h) |
 | `LOG_LEVEL` | ❌ | DEBUG, INFO, WARNING, ERROR |
 | `WEB_AUTH_TOKEN` | ❌ | Web dashboard token (recommended in production) |
 | `WEB_HOST` | ❌ | e.g. 127.0.0.1 or 0.0.0.0 |
@@ -149,7 +149,7 @@ Full guide: [DEPLOY.md](DEPLOY.md)
 
 **`/clean_state` types:** `dedup` (history), `http_cache`, `html_hashes`, `tudo`. A backup is always created before cleaning.
 
-Full reference: [COMMANDS_REFERENCE.md](../COMMANDS_REFERENCE.md) | Quick list: [COMANDOS.md](../COMANDOS.md)
+Full reference: [COMMANDS_REFERENCE.md](COMMANDS_REFERENCE.md) | Quick list: [COMANDOS.md](COMANDOS.md) | [Changelog](CHANGELOG.md)
 
 ---
 
@@ -223,8 +223,11 @@ projeto-bot-games/
 ├── utils/              # Logger, storage, security, translator
 ├── web/                # Dashboard server
 ├── translations/       # PT-BR and EN
-├── docs/               # Documentation
-└── logs/               # Bot logs
+├── deploy/             # Dockerfile and container entrypoint
+├── assets/             # Branding (e.g. icon.png)
+├── docs/               # Documentation (index, deploy, commands, changelog)
+├── scripts/            # Optional helper scripts
+└── tests/              # Pytest suite
 ```
 
 ---

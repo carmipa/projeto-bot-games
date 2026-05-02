@@ -1,6 +1,6 @@
 # 📋 Lista de Comandos — GameBot
 
-**Versão:** 2.1 | **Intervalo padrão:** 12h
+**Versão:** 2.1 | **Intervalo padrão:** 24h
 
 ---
 
@@ -47,7 +47,7 @@
 | Variável | Padrão | Descrição |
 |----------|--------|-----------|
 | `DISCORD_TOKEN` | — | Token do bot (obrigatório) |
-| `LOOP_MINUTES` | 720 | Intervalo de varredura (min) — 720 = 12h |
+| `LOOP_MINUTES` | 1440 | Intervalo de varredura (min) — 1440 = 24h |
 | `LOG_LEVEL` | INFO | DEBUG, INFO, WARNING, ERROR |
 
 ---

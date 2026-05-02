@@ -4,11 +4,40 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 
 ---
 
+## [2.1.4] - 2026-05-02
+
+### Alterado
+
+- **`deploy/`** — `Dockerfile` e `entrypoint.sh` concentrados aqui; `docker-compose.yml` na raiz usa `dockerfile: deploy/Dockerfile`
+- **`assets/`** — Ícone e marca (`assets/icon.png` referenciado no README; ver `assets/README.md`)
+- **`docs/README.md`** — Índice da documentação; removido `docs/readme.md` duplicado do guia PT (conteúdo principal permanece no README da raiz)
+
+---
+
+## [2.1.3] - 2026-05-02
+
+### Alterado
+
+- **Layout do repositório** — `.md` de suporte movidos para `docs/` (mantém-se apenas `README.md` na raiz). Guias: `docs/DEPLOY.md`, `docs/COMMANDS_REFERENCE.md`, `docs/COMANDOS.md`, `docs/CHANGELOG.md`
+- **`scripts/`** — Utilitários `add_sources_script.py`, `add_yt_sources.py`, `check_overlap.py` (caminhos relativos à raiz do projeto)
+
+---
+
+## [2.1.2] - 2026-05-02
+
+### Alterado
+
+- **Intervalo de varredura: 24h** — Padrão `LOOP_MINUTES` = 1440 (antes 720 / 12h)
+- **Filtro de conteúdo** — Termo `gundam` em `LIXO_FILTER` para descartar títulos/resumos relacionados
+- **`scripts/add_yt_sources.py`** — Exemplo genérico sem referências a canais legados
+
+---
+
 ## [2.1.1] - 2026-02-19
 
 ### ✨ Adicionado
 
-- **Intervalo de varredura: 12h** — Padrão alterado de 6h (360 min) para 12h (720 min)
+- **Intervalo de varredura: 12h** — Padrão alterado de 6h (360 min) para 12h (720 min) *(supersedido em 2.1.2 por 24h)*
 - **COMANDOS.md** — Lista rápida de comandos para referência
 - **Exponential backoff** — Retry com backoff (1s, 2s, 4s) em falhas de RSS e HTML Monitor
 - **Source Health Monitor** — Log detalhado quando fonte falha 3+ vezes
