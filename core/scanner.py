@@ -12,6 +12,7 @@ from datetime import datetime, timedelta, timezone
 from dateutil import parser as dtparser
 from typing import List, Set, Tuple, Dict, Any
 from urllib.parse import urlparse, urlunparse
+from urllib.parse import urljoin
 import time
 import os
 import random
@@ -26,10 +27,14 @@ from settings import (
     FEED_FETCH_JITTER_MAX,
     FEED_FETCH_JITTER_MIN,
     FEED_TIMEOUT_SECONDS,
+    ENABLE_OG_IMAGE_FALLBACK,
     LOOP_MINUTES,
     MAX_CONCURRENT_FEEDS,
     MAX_ENTRIES_PER_FEED,
     MAX_NEWS_AGE_DAYS,
+    OG_IMAGE_ALLOWED_DOMAINS,
+    OG_IMAGE_MAX_BYTES,
+    OG_IMAGE_TIMEOUT_SECONDS,
     RSS_MAX_RETRIES,
     RSS_RETRY_BACKOFF_BASE,
     STRICT_GENERIC_YOUTUBE,
@@ -365,6 +370,134 @@ def get_youtube_duration_seconds(entry: Any) -> int | None:
     return None
 
 
+def _is_probable_image_url(url: str) -> bool:
+    u = (url or "").lower()
+    return any(ext in u for ext in (".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif"))
+
+
+def _is_probable_video_url(url: str) -> bool:
+    u = (url or "").lower()
+    return any(ext in u for ext in (".mp4", ".webm", ".mov", ".m3u8"))
+
+
+def extract_entry_media_urls(entry: Any) -> tuple[str | None, str | None]:
+    """
+    Tenta extrair URLs de imagem e vídeo de entradas RSS/Atom genéricas.
+    Prioriza campos padrão de feedparser (media_content, media_thumbnail, links/enclosure).
+    """
+    image_url: str | None = None
+    video_url: str | None = None
+
+    try:
+        media_content = getattr(entry, "media_content", None) or []
+        if isinstance(media_content, list):
+            for item in media_content:
+                if not isinstance(item, dict):
+                    continue
+                url = str(item.get("url") or "").strip()
+                mtype = str(item.get("type") or "").lower()
+                if not url:
+                    continue
+                if ("image" in mtype or _is_probable_image_url(url)) and not image_url:
+                    image_url = url
+                if ("video" in mtype or _is_probable_video_url(url)) and not video_url:
+                    video_url = url
+    except Exception:
+        pass
+
+    try:
+        media_thumb = getattr(entry, "media_thumbnail", None) or []
+        if isinstance(media_thumb, list):
+            for item in media_thumb:
+                if isinstance(item, dict):
+                    url = str(item.get("url") or "").strip()
+                    if url:
+                        image_url = image_url or url
+                        break
+    except Exception:
+        pass
+
+    try:
+        links = getattr(entry, "links", None) or []
+        if isinstance(links, list):
+            for l in links:
+                if not isinstance(l, dict):
+                    continue
+                rel = str(l.get("rel") or "").lower()
+                ltype = str(l.get("type") or "").lower()
+                href = str(l.get("href") or "").strip()
+                if rel != "enclosure" or not href:
+                    continue
+                if ("image" in ltype or _is_probable_image_url(href)) and not image_url:
+                    image_url = href
+                if ("video" in ltype or _is_probable_video_url(href)) and not video_url:
+                    video_url = href
+    except Exception:
+        pass
+
+    if image_url and not image_url.startswith(("http://", "https://")):
+        image_url = None
+    if video_url and not video_url.startswith(("http://", "https://")):
+        video_url = None
+    return image_url, video_url
+
+
+async def extract_og_image_safe(session: aiohttp.ClientSession, article_url: str) -> str | None:
+    """
+    Fallback seguro para og:image:
+    - Opt-in por env
+    - Whitelist de domínios (se configurada)
+    - Validação anti-SSRF
+    - Timeout curto
+    - Limite de bytes para HTML
+    """
+    if not ENABLE_OG_IMAGE_FALLBACK:
+        return None
+    if not article_url or not article_url.startswith(("http://", "https://")):
+        return None
+
+    ok, err = validate_url(article_url, allowed_domains=OG_IMAGE_ALLOWED_DOMAINS or None)
+    if not ok:
+        log.debug("og:image fallback bloqueado para %s (%s)", article_url, err)
+        return None
+
+    try:
+        timeout = aiohttp.ClientTimeout(total=OG_IMAGE_TIMEOUT_SECONDS)
+        async with session.get(article_url, headers=get_robust_headers(), timeout=timeout) as resp:
+            if resp.status != 200:
+                return None
+            ctype = str(resp.headers.get("Content-Type", "")).lower()
+            if "text/html" not in ctype and "application/xhtml" not in ctype:
+                return None
+            raw = await resp.content.read(OG_IMAGE_MAX_BYTES)
+            html = raw.decode("utf-8", errors="ignore")
+    except Exception as e:
+        log.debug("og:image fallback falhou para %s: %s", article_url, e)
+        return None
+
+    patterns = [
+        r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']',
+        r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']',
+        r'<meta[^>]+name=["\']twitter:image["\'][^>]+content=["\']([^"\']+)["\']',
+        r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+name=["\']twitter:image["\']',
+    ]
+    image_url = None
+    for p in patterns:
+        m = re.search(p, html, re.IGNORECASE)
+        if m:
+            image_url = m.group(1).strip()
+            break
+    if not image_url:
+        return None
+
+    image_url = urljoin(article_url, image_url)
+    ok_img, err_img = validate_url(image_url)
+    if not ok_img:
+        log.debug("og:image inválido/unsafe (%s): %s", image_url, err_img)
+        return None
+    return image_url
+
+
 def get_news_metadata(title: str, url: str) -> tuple[str, discord.Color]:
     """
     Retorna (prefixo, cor) baseado em keywords e source url.
@@ -679,6 +812,9 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
 
                     title = entry.get("title") or ""
                     summary = entry.get("summary") or entry.get("description") or ""
+                    entry_image_url, entry_video_url = extract_entry_media_urls(entry)
+                    if not entry_image_url:
+                        entry_image_url = await extract_og_image_safe(session, link)
 
                     # Filtro de conteúdo (LIXO_FILTER): descarta ruído e loga
                     if should_skip_by_content(title, summary):
@@ -794,11 +930,12 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                                 footer_text = f"{footer_text} • {t.get('embed.published_at', lang=target_lang, date=date_str)}"
                             embed.set_footer(text=footer_text)
                             
-                            if hasattr(entry, "media_thumbnail") and entry.media_thumbnail:
+                            if entry_image_url:
+                                # Imagem grande no corpo do embed para artigos com capa.
+                                embed.set_image(url=entry_image_url)
+                            elif hasattr(entry, "media_thumbnail") and entry.media_thumbnail:
                                 try:
                                     thumb_url = entry.media_thumbnail[0].get("url")
-                                    # Se for mídia (video), as vezes a thumb do RSS é ruim ou duplica o player.
-                                    # Mas vamos manter por enquanto.
                                     if thumb_url:
                                         embed.set_thumbnail(url=thumb_url)
                                 except (IndexError, AttributeError, KeyError) as e:
@@ -843,6 +980,18 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                                     style=discord.ButtonStyle.link,
                                 )
                             )
+                            # Quando o feed expõe vídeo direto (não YouTube), adiciona atalho explícito.
+                            if entry_video_url:
+                                safe_video = safe_https_button_url(entry_video_url)
+                                if safe_video:
+                                    view.add_item(
+                                        discord.ui.Button(
+                                            label="Assistir vídeo",
+                                            url=safe_video,
+                                            emoji="🎬",
+                                            style=discord.ButtonStyle.link,
+                                        )
+                                    )
 
                             await channel.send(content=msg_content, embed=embed_to_send, view=view)
 

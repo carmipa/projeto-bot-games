@@ -47,6 +47,16 @@ FEED_FETCH_JITTER_MAX = _env_float("FEED_FETCH_JITTER_MAX", 1.2)
 # Fontes genéricas (YouTube agregadores) exigem sinal semântico no título
 STRICT_GENERIC_YOUTUBE = os.getenv("STRICT_GENERIC_YOUTUBE", "1") == "1"
 
+# Fallback opcional e seguro para imagem via og:image (sem scraping amplo)
+ENABLE_OG_IMAGE_FALLBACK = os.getenv("ENABLE_OG_IMAGE_FALLBACK", "0") == "1"
+OG_IMAGE_TIMEOUT_SECONDS = _env_int("OG_IMAGE_TIMEOUT_SECONDS", 5)
+OG_IMAGE_MAX_BYTES = _env_int("OG_IMAGE_MAX_BYTES", 262144)  # 256KB de HTML no máximo
+OG_IMAGE_ALLOWED_DOMAINS = [
+    d.strip().lower()
+    for d in os.getenv("OG_IMAGE_ALLOWED_DOMAINS", "").split(",")
+    if d.strip()
+]
+
 # HTTP / Feeds – User-Agent rotativo para se parecer com usuário navegando real (Evita bloqueios)
 BROWSER_USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
