@@ -41,6 +41,8 @@ RSS_MAX_RETRIES = _env_int("RSS_MAX_RETRIES", 3)
 RSS_RETRY_BACKOFF_BASE = _env_float("RSS_RETRY_BACKOFF_BASE", 1.0)
 MAX_ENTRIES_PER_FEED = _env_int("MAX_ENTRIES_PER_FEED", 10)
 MAX_NEWS_AGE_DAYS = _env_int("MAX_NEWS_AGE_DAYS", 7)
+# 1 = exige data de publicação no feed (evita postar itens antigos sem timestamp confiável)
+REQUIRE_ENTRY_DATE = os.getenv("REQUIRE_ENTRY_DATE", "1") == "1"
 FEED_FETCH_JITTER_MIN = _env_float("FEED_FETCH_JITTER_MIN", 0.3)
 FEED_FETCH_JITTER_MAX = _env_float("FEED_FETCH_JITTER_MAX", 1.2)
 

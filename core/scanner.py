@@ -35,6 +35,7 @@ from settings import (
     OG_IMAGE_ALLOWED_DOMAINS,
     OG_IMAGE_MAX_BYTES,
     OG_IMAGE_TIMEOUT_SECONDS,
+    REQUIRE_ENTRY_DATE,
     RSS_MAX_RETRIES,
     RSS_RETRY_BACKOFF_BASE,
     STRICT_GENERIC_YOUTUBE,
@@ -635,13 +636,14 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
         feeds_empty = 0
         feeds_errors = 0
         feeds_blocked_security = 0
+        entries_undated_skipped = 0
         
         semaphore = asyncio.Semaphore(MAX_CONCURRENT_FEEDS)
         RSS_BACKOFF = [RSS_RETRY_BACKOFF_BASE * (2 ** i) for i in range(max(1, RSS_MAX_RETRIES))]
         source_failures = state["source_failures"]
 
         async def fetch_and_process_feed(session, url):
-            nonlocal cache_hits, state, feeds_empty, feeds_errors, feeds_blocked_security
+            nonlocal cache_hits, state, feeds_empty, feeds_errors, feeds_blocked_security, entries_undated_skipped
 
             async with semaphore:
                 # Validação de segurança: anti-SSRF
@@ -809,6 +811,10 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                         if age.days > MAX_NEWS_AGE_DAYS:
                             log.debug(f"👴 [Old] Ignorado (idade {age.days}d, máx. {MAX_NEWS_AGE_DAYS} dias): {link}")
                             continue
+                    elif REQUIRE_ENTRY_DATE:
+                        entries_undated_skipped += 1
+                        log.debug(f"🕒 [Undated] Ignorado por falta de data no feed: {link}")
+                        continue
 
                     title = entry.get("title") or ""
                     summary = entry.get("summary") or entry.get("description") or ""
@@ -1126,11 +1132,12 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
         
         log.info(
             "📊 [Scan Summary] total_feeds=%s | feeds_com_erro=%s | feeds_vazios=%s | "
-            "feeds_bloqueados_seguranca=%s | cache_304=%s | posts_enviados=%s | trigger=%s",
+            "feeds_bloqueados_seguranca=%s | sem_data_descartadas=%s | cache_304=%s | posts_enviados=%s | trigger=%s",
             total_feeds if 'total_feeds' in locals() else len(urls),
             feeds_errors,
             feeds_empty,
             feeds_blocked_security,
+            entries_undated_skipped,
             cache_hits,
             sent_count,
             trigger,
