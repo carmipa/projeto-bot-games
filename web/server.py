@@ -35,7 +35,13 @@ def rate_limit_middleware(handler):
     async def wrapper(request):
         client_ip = request.remote
         current_time = datetime.now().timestamp()
-        
+
+        # Remove IPs inativos para evitar crescimento ilimitado do dict
+        stale = [ip for ip, ts_list in _rate_limit_store.items()
+                 if not ts_list or current_time - max(ts_list) > RATE_LIMIT_WINDOW]
+        for ip in stale:
+            del _rate_limit_store[ip]
+
         # Limpa entradas antigas
         if client_ip in _rate_limit_store:
             _rate_limit_store[client_ip] = [
@@ -44,7 +50,7 @@ def rate_limit_middleware(handler):
             ]
         else:
             _rate_limit_store[client_ip] = []
-        
+
         # Verifica limite
         if len(_rate_limit_store[client_ip]) >= RATE_LIMIT_MAX_REQUESTS:
             log.warning(f"⚠️ Rate limit excedido para IP: {client_ip}")

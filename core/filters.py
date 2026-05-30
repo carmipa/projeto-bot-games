@@ -57,7 +57,8 @@ def should_skip_by_content(title: str, summary: str) -> bool:
     if not raw:
         return False
     for kw in LIXO_FILTER:
-        if kw in raw:
+        # Usa word boundary para evitar falso-positivo: "review" não deve filtrar "preview"
+        if re.search(r'\b' + re.escape(kw) + r'\b', raw):
             return True
     return False
 

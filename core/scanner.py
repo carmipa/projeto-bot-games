@@ -258,17 +258,18 @@ async def resolve_youtube_urls(
     state: Dict[str, Any],
     timeout: aiohttp.ClientTimeout,
 ) -> List[str]:
-    """Resolve todas as URLs de canal YouTube (@ ou /channel/) para URLs de feed RSS."""
+    """Resolve todas as URLs de canal YouTube (@ ou /channel/) para URLs de feed RSS (concorrente)."""
     cache = state.setdefault("youtube_feed_cache", {})
     feed_map = _load_youtube_feed_map()
-    resolved: List[str] = []
-    for u in urls:
+    sem = asyncio.Semaphore(5)
+
+    async def _resolve(u: str) -> str:
         if _is_youtube_url(u) and not _is_youtube_feed_url(u):
-            r = await get_yt_rss(session, u, cache, timeout, feed_map)
-            resolved.append(r)
-        else:
-            resolved.append(u)
-    return resolved
+            async with sem:
+                return await get_yt_rss(session, u, cache, timeout, feed_map)
+        return u
+
+    return list(await asyncio.gather(*[_resolve(u) for u in urls]))
 
 
 def sanitize_link(link: str) -> str:
