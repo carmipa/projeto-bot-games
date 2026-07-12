@@ -17,7 +17,7 @@ Bot funcional e consciente de segurança (anti-SSRF com resolução DNS, autoriz
 ### Segurança
 | Sev | Achado | Correção |
 |-----|--------|----------|
-| HIGH | `.dockerignore` não excluía `.env` → `COPY . .` assava `DISCORD_TOKEN`/`WEB_AUTH_TOKEN` na imagem. (Token **não** vazou pelo git — `.gitignore` protege; git history confirma) | `.dockerignore` += `.env`/`.env.*`. **Ação manual pendente: rotacionar os tokens** |
+| HIGH | `.dockerignore` não excluía `.env` → `COPY . .` assava `DISCORD_TOKEN`/`WEB_AUTH_TOKEN` na imagem. (Token **não** vazou pelo git — `.gitignore` protege; git history confirma) | `.dockerignore` += `.env`/`.env.*`. **Rotação NÃO necessária** desde que nenhuma imagem já construída tenha sido enviada a um registry compartilhado/público (o `docker-compose build` só monta local, sem push). Tokens estão protegidos. |
 | MED | `/now` e botão "Verificar Agora" sem checagem de permissão (DoS) | Gate de Administrador em ambos |
 | MED | Redirects seguidos sem revalidar anti-SSRF | *Mantido* (quebrar redirect prejudica sites que redirecionam www/https); risco baixo (fontes só via operador) |
 | MED | Sem `allowed_mentions` → `@everyone` via título de feed | `allowed_mentions.none()` no Bot |
