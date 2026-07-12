@@ -34,10 +34,8 @@ class FilterDashboard(discord.ui.View):
         save_json_safe(p("config.json"), cfg)
 
     def _is_admin(self, interaction: discord.Interaction) -> bool:
-        try:
-            return bool(interaction.user.guild_permissions.administrator)
-        except (AttributeError, Exception):
-            return False
+        perms = getattr(interaction.user, "guild_permissions", None)
+        return bool(perms and perms.administrator)
 
     def _get_lang(self) -> str:
         cfg = self._cfg()

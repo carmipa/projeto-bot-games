@@ -206,8 +206,8 @@ class DashboardCog(commands.Cog):
             # Última tentativa: enviar no canal
             try:
                 await target_channel.send(f"{interaction.user.mention}: ✅ Canal configurado: <#{channel_id}>")
-            except:
-                pass
+            except (discord.HTTPException, discord.Forbidden) as final_err:
+                log.debug(f"Falha final ao confirmar canal: {final_err}")
     
     @set_canal.error
     async def set_canal_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):

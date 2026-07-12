@@ -13,6 +13,12 @@ from settings import LOOP_MINUTES
 log = logging.getLogger("GameBot")
 
 
+def _is_admin(interaction: discord.Interaction) -> bool:
+    """True se o autor da interação tem permissão de Administrador na guild."""
+    member = interaction.user
+    perms = getattr(member, "guild_permissions", None)
+    return bool(perms and perms.administrator)
+
 
 class ScanButton(discord.ui.View):
     def __init__(self, run_scan_func):
@@ -22,6 +28,10 @@ class ScanButton(discord.ui.View):
     @discord.ui.button(label="Verificar Agora", style=discord.ButtonStyle.primary, emoji="🔄", custom_id="status_scan_now")
     async def scan_now(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer(ephemeral=True)
+        # Só administradores podem disparar varredura manual (evita abuso/DoS)
+        if not _is_admin(interaction):
+            await interaction.followup.send("❌ Apenas administradores podem forçar uma varredura.", ephemeral=True)
+            return
         try:
             # Feedback imediato
             await interaction.followup.send("🔎 Iniciando verificação manual...", ephemeral=True)
@@ -115,6 +125,10 @@ class StatusCog(commands.Cog):
     async def now(self, interaction: discord.Interaction):
         """Verifica notícias imediatamente."""
         await interaction.response.defer(ephemeral=True)
+        # Só administradores podem forçar varredura (evita abuso/DoS por membros comuns)
+        if not _is_admin(interaction):
+            await interaction.followup.send("❌ Apenas administradores podem forçar uma varredura.", ephemeral=True)
+            return
         try:
             await interaction.followup.send("🚀 Iniciando varredura manual (comando /now)...", ephemeral=True)
             await self.run_scan_once(trigger="command_now")

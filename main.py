@@ -34,7 +34,12 @@ async def main():
     intents.message_content = True
 
     # Bot Instance
-    bot = commands.Bot(command_prefix=COMMAND_PREFIX, intents=intents)
+    # allowed_mentions.none(): impede que título/resumo de feed externo dispare @everyone/@here/roles
+    bot = commands.Bot(
+        command_prefix=COMMAND_PREFIX,
+        intents=intents,
+        allowed_mentions=discord.AllowedMentions.none(),
+    )
 
     # =========================================================
     # EVENTOS
@@ -87,10 +92,14 @@ async def main():
             # Sincroniza global (pode demorar) ou por guild
             # Para dev, sync por guild é mais rápido e garante update imediato
             # IMPORTANTE: É necessário copiar os globais para a guild antes de syncar a guild
-            for guild in bot.guilds:
-                bot.tree.copy_global_to(guild=discord.Object(id=guild.id))
-                await bot.tree.sync(guild=discord.Object(id=guild.id))
-                log.info(f"Comandos sincronizados (copy_global) em: {guild.name}")
+            # on_ready pode disparar várias vezes (reconexões); sincroniza só uma vez por processo
+            # para evitar rate limit da API de comandos do Discord.
+            if not getattr(bot, "_commands_synced", False):
+                for guild in bot.guilds:
+                    bot.tree.copy_global_to(guild=discord.Object(id=guild.id))
+                    await bot.tree.sync(guild=discord.Object(id=guild.id))
+                    log.info(f"Comandos sincronizados (copy_global) em: {guild.name}")
+                bot._commands_synced = True
         except discord.HTTPException as e:
             log.error(f"Erro HTTP no sync de comandos: {e.status} - {e.text}")
         except Exception as e:
@@ -133,7 +142,7 @@ async def main():
                         color=discord.Color.from_rgb(255, 100, 0) # Orange/Red theme
                     )
                     
-                    embed.set_footer(text=f"Status: Operacional | Rede: 192.168.0.50 (Guarulhos) | Deploy: {time_str} BRT")
+                    embed.set_footer(text=f"Status: Operacional | Deploy: {time_str} BRT")
                     
                     await target_channel.send(embed=embed)
                     

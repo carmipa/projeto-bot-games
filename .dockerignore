@@ -1,3 +1,8 @@
+# Segredos (NUNCA assar na imagem)
+.env
+.env.*
+!.env.example
+
 # Git
 .git
 .gitignore
@@ -35,6 +40,11 @@ logs/
 config.json
 history.json
 state.json
+
+# Assets/relatórios só de documentação (não usados em runtime)
+icon.png
+assets/
+analises/
 
 # Documentação
 README.md

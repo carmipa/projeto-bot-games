@@ -2,6 +2,7 @@
 Web Server module using aiohttp.
 Integrates directly with the bot loop.
 """
+import hmac
 import logging
 from aiohttp import web
 import aiohttp_jinja2
@@ -85,7 +86,8 @@ def auth_required(handler):
             )
         
         token = auth_header.replace("Bearer ", "").strip()
-        if token != WEB_AUTH_TOKEN:
+        # Comparação constant-time evita timing side-channel na validação do token
+        if not hmac.compare_digest(token, WEB_AUTH_TOKEN):
             log.warning(f"⚠️ Tentativa de acesso com token inválido de IP: {request.remote}")
             return web.json_response(
                 {"error": "Invalid token"},
@@ -119,6 +121,13 @@ def security_headers_middleware(handler):
         
         return response
     return wrapper
+
+
+@routes.get('/health')
+async def health(request):
+    """Liveness sem autenticação: prova que o event loop/web server responde.
+    Usado pelo HEALTHCHECK do Docker. Não expõe dados sensíveis."""
+    return web.json_response({"status": "ok"})
 
 
 @routes.get('/')
