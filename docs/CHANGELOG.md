@@ -32,6 +32,12 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 - Dependências com piso acima de CVEs (aiohttp ≥3.10.11, jinja2 ≥3.1.6) e teto de major
 - `HEALTHCHECK` real via `/health` (antes só checava existência de `config.json`)
 
+### Arquitetura / Manutenção
+- **Stack HTTP consolidado**: `html_monitor` e o script de fontes migrados de `httpx` para `aiohttp` (dependência `httpx` removida)
+- **`run_scan_once` decomposto**: extraídos `build_news_message()` (monta content/embed/view, testável) e `_run_html_monitor()` (dispatch de alertas); ~590 → ~464 linhas, com testes novos para ambos
+- **Ambiente de dev**: alvo Python 3.12 (o 3.14 local tinha `_ctypes` quebrado); suíte roda limpa (**59 passed**)
+- Notícias são traduzidas para o idioma do servidor (PT/EN via `/setlang`); respostas de comando permanecem em pt-BR (README ajustado). Filtros por servidor foram removidos (só filtro de ruído global)
+
 ---
 
 ## [2.1.4] - 2026-05-02

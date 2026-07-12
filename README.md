@@ -4,7 +4,7 @@
 
 # 🎮 GameBot — Documentação (PT-BR)
 
-Bot de Discord para **notícias e trailers de jogos**. Monitora lançamentos, DLCs, trailers no YouTube e novidades de jogos, com filtros por categoria e suporte a múltiplos servidores.
+Bot de Discord para **notícias e trailers de jogos**. Monitora lançamentos, DLCs, trailers no YouTube e novidades de jogos, com filtro de ruído global e suporte a múltiplos servidores.
 
 ---
 
@@ -35,7 +35,7 @@ Bot de Discord para **notícias e trailers de jogos**. Monitora lançamentos, DL
 | 🔄 **Deduplicação** | Não repete notícias (histórico em `history.json`) |
 | 🌐 **Multi-Guild** | Configuração independente por servidor Discord |
 | 🖥️ **Web Dashboard** | Painel em tempo real (opcional, porta 8080) |
-| 🌍 **Multi-idioma** | Português e Inglês (`/setlang`) |
+| 🌍 **Notícias multi-idioma** | Notícias traduzidas para o idioma do servidor — PT/EN via `/setlang`. As respostas dos comandos são em pt-BR. |
 | 🔒 **Validação de URLs** | Proteção anti-SSRF |
 | 🛡️ **Rate limiting** | Proteção no servidor web e comandos |
 | 🧹 **Auto-cleanup** | Limpeza de cache periódica (configurável) |
@@ -111,7 +111,7 @@ Guia completo: [docs/DEPLOY.md](docs/DEPLOY.md)
 
 1. Convide o bot com permissões **Enviar Mensagens** e **Incorporar Links**.
 2. Use **`/set_canal`** no canal desejado ou **`/dashboard`** para abrir o painel.
-3. Configure os filtros no dashboard.
+3. (Opcional) Escolha o idioma das notícias no dashboard.
 4. O bot passa a publicar conforme o intervalo definido em `LOOP_MINUTES`.
 
 ---
@@ -123,7 +123,7 @@ Guia completo: [docs/DEPLOY.md](docs/DEPLOY.md)
 | Comando | Descrição |
 |---------|-----------|
 | `/set_canal` | Define o canal onde o bot envia notícias e trailers |
-| `/dashboard` | Abre o painel de filtros e define o canal atual |
+| `/dashboard` | Define o canal atual e abre o painel de idioma |
 | `/forcecheck` | Força uma varredura imediata das fontes |
 | `/clean_state` | Limpa cache/histórico (com backup e confirmação) |
 
@@ -144,7 +144,7 @@ Guia completo: [docs/DEPLOY.md](docs/DEPLOY.md)
 ```bash
 /set_canal                    # Usa o canal atual
 /set_canal canal:#noticias    # Canal específico
-/dashboard                    # Painel de filtros
+/dashboard                    # Define canal + painel de idioma
 /setlang idioma:pt_BR         # Português
 /setlang idioma:en_US         # Inglês
 /clean_state tipo:dedup confirmar:não   # Ver estatísticas
@@ -218,11 +218,11 @@ projeto-bot-games/
 ├── requirements.txt
 ├── .env.example
 ├── sources.json         # Fontes RSS/YouTube
-├── config.json          # Gerado: canal e filtros por servidor
+├── config.json          # Gerado: canal e idioma por servidor
 ├── state.json           # Gerado: cache e histórico
 ├── history.json         # Gerado: links já enviados
 ├── bot/cogs/            # Comandos (admin, dashboard, status, info)
-├── bot/views/           # Painel de filtros
+├── bot/views/           # Painel de idioma
 ├── core/                # Scanner, filtros, html_monitor
 ├── utils/               # Logger, storage, security, translator
 ├── web/                 # Servidor do dashboard
