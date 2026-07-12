@@ -47,6 +47,12 @@ def _normalize_for_filter(text: str) -> str:
     return (text or "").lower().strip()
 
 
+# Alternância única pré-compilada (antes: ~50 re.search por entrada). Word boundary evita
+# falso-positivo ("review" não deve filtrar "preview"). Termos já em minúsculas -> texto é
+# minusculado antes da busca, mantendo o comportamento original.
+_LIXO_PATTERN = re.compile(r'\b(?:' + '|'.join(re.escape(kw) for kw in LIXO_FILTER) + r')\b')
+
+
 def should_skip_by_content(title: str, summary: str) -> bool:
     """
     Retorna True se a notícia for considerada "ruído" (LIXO_FILTER).
@@ -54,13 +60,9 @@ def should_skip_by_content(title: str, summary: str) -> bool:
     Foco do bot: trailers, announcements e official reveals apenas.
     """
     raw = f"{_normalize_for_filter(title)} {_normalize_for_filter(summary)}"
-    if not raw:
+    if not raw.strip():
         return False
-    for kw in LIXO_FILTER:
-        # Usa word boundary para evitar falso-positivo: "review" não deve filtrar "preview"
-        if re.search(r'\b' + re.escape(kw) + r'\b', raw):
-            return True
-    return False
+    return bool(_LIXO_PATTERN.search(raw))
 
 
 def _contains_any(text: str, keywords: List[str]) -> bool:

@@ -4,12 +4,27 @@ Translator utilities - Localization and Google Translate wrapper.
 import json
 import logging
 import asyncio
+from collections import OrderedDict
 from typing import Dict, Any, Optional
 from deep_translator import GoogleTranslator
 
 from utils.storage import p, load_json_safe
 
 log = logging.getLogger("GameBot")
+
+# Reuso de instâncias do GoogleTranslator por idioma (antes: nova instância a cada chamada)
+_translator_instances: Dict[str, GoogleTranslator] = {}
+# Cache LRU de traduções para evitar round-trips repetidos ao Google (mesmo texto/idioma)
+_translation_cache: "OrderedDict[tuple, str]" = OrderedDict()
+_TRANSLATION_CACHE_MAX = 512
+
+
+def _get_translator(target: str) -> GoogleTranslator:
+    inst = _translator_instances.get(target)
+    if inst is None:
+        inst = GoogleTranslator(source="auto", target=target)
+        _translator_instances[target] = inst
+    return inst
 
 
 class Translator:
@@ -120,12 +135,24 @@ async def translate_to_target(text: str, target_lang: str) -> str:
             'en_US': 'en',
         }
         target = google_map.get(target_lang) or 'en'
-        
+
+        # Cache LRU: mesmo texto+idioma não refaz round-trip ao Google
+        cache_key = (target, text)
+        cached = _translation_cache.get(cache_key)
+        if cached is not None:
+            _translation_cache.move_to_end(cache_key)
+            return cached
+
         loop = asyncio.get_running_loop()
-        trad = await loop.run_in_executor(
-            None,
-            lambda: GoogleTranslator(source="auto", target=target).translate(text)
-        )
+        translator = _get_translator(target)
+        trad = await loop.run_in_executor(None, translator.translate, text)
+        if trad is None:
+            return text
+
+        _translation_cache[cache_key] = trad
+        _translation_cache.move_to_end(cache_key)
+        if len(_translation_cache) > _TRANSLATION_CACHE_MAX:
+            _translation_cache.popitem(last=False)
         return trad
     except Exception as e:
         log.debug(f"Falha na tradução de texto (retornando original): {type(e).__name__}: {e}")

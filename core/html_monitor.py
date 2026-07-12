@@ -10,7 +10,7 @@ import httpx
 import asyncio
 from typing import List, Dict, Tuple
 from bs4 import BeautifulSoup
-from settings import BROWSER_USER_AGENTS
+from settings import BROWSER_USER_AGENTS, MAX_CONCURRENT_FEEDS
 
 from utils.storage import p, load_json_safe, save_json_safe
 from utils.security import validate_url, sanitize_log_message
@@ -27,56 +27,64 @@ IGNORE_SELECTORS = ['.ad', '.advertisement', '.widget', '.cookie-consent']
 HTML_FETCH_BACKOFF = [1, 2, 4]
 HTML_FETCH_MAX_RETRIES = 3
 
+def _extract_title_and_hash(content: str) -> tuple[str, str]:
+    """Parse/limpa HTML e devolve (title, sha256 do texto). Função síncrona pesada
+    (BeautifulSoup) — deve rodar em executor para não bloquear o event loop."""
+    soup = BeautifulSoup(content, "html.parser")
+
+    # Remove noise tags
+    for tag in soup(IGNORE_TAGS):
+        tag.decompose()
+
+    # Remove noise classes (Safe attempt)
+    for selector in IGNORE_SELECTORS:
+        for match in soup.select(selector):
+            match.decompose()
+
+    # Get text content only (ignoring HTML structure changes)
+    text_content = soup.get_text(separator=" ", strip=True)
+    page_hash = hashlib.sha256(text_content.encode("utf-8")).hexdigest()
+
+    # soup.title.string pode ser None mesmo com <title> presente
+    title = "No Title"
+    if soup.title and soup.title.string:
+        title = soup.title.string.strip()
+    return title, page_hash
+
+
 async def fetch_page_hash(
-    client: httpx.AsyncClient, url: str, use_ua: str | None = None
+    client: httpx.AsyncClient, url: str, sem: asyncio.Semaphore | None = None
 ) -> tuple[str, str, str]:
     """
     Fetches a page, cleans it, and returns (url, title, hash).
+    O parse/hash (BeautifulSoup) roda em executor; downloads concorrentes são limitados
+    pelo semáforo (evita baixar dezenas de páginas HTML inteiras ao mesmo tempo).
     """
-    last_error: Exception | None = None
+    # Validação de segurança (anti-SSRF) uma única vez, antes das tentativas
+    is_valid, error_msg = validate_url(url)
+    if not is_valid:
+        log.warning(sanitize_log_message(f"🔒 URL bloqueada por segurança no HTML Monitor: {url} - {error_msg}"))
+        return url, "", ""
+
     for attempt in range(HTML_FETCH_MAX_RETRIES):
         try:
-            # Validação de segurança: anti-SSRF
-            is_valid, error_msg = validate_url(url)
-            if not is_valid:
-                log.warning(sanitize_log_message(f"🔒 URL bloqueada por segurança no HTML Monitor: {url} - {error_msg}"))
-                return url, "", ""
-
             headers = get_robust_headers()
-            resp = await client.get(
-                url,
-                follow_redirects=True,
-                headers=headers,
-            )
+            if sem is not None:
+                async with sem:
+                    resp = await client.get(url, follow_redirects=True, headers=headers)
+            else:
+                resp = await client.get(url, follow_redirects=True, headers=headers)
+
             if resp.status_code != 200:
                 log.debug(f"HTML Monitor: {url} returned {resp.status_code}")
                 return url, "", ""
 
             content = resp.text
-
-            # Parse and Clean
-            soup = BeautifulSoup(content, "html.parser")
-
-            # Remove noise tags
-            for tag in soup(IGNORE_TAGS):
-                tag.decompose()
-
-            # Remove noise classes (Safe attempt)
-            for selector in IGNORE_SELECTORS:
-                for match in soup.select(selector):
-                    match.decompose()
-
-            # Get text content only (ignoring HTML structure changes)
-            text_content = soup.get_text(separator=" ", strip=True)
-
-            # Hash calculation
-            page_hash = hashlib.sha256(text_content.encode("utf-8")).hexdigest()
-            title = soup.title.string.strip() if soup.title else "No Title"
-
+            loop = asyncio.get_running_loop()
+            title, page_hash = await loop.run_in_executor(None, _extract_title_and_hash, content)
             return url, title, page_hash
 
         except httpx.RequestError as e:
-            last_error = e
             if attempt < HTML_FETCH_MAX_RETRIES - 1:
                 delay = HTML_FETCH_BACKOFF[attempt]
                 log.debug(f"HTML Monitor: retry em {delay}s para '{url}' (tentativa {attempt + 1}): {e}")
@@ -85,7 +93,6 @@ async def fetch_page_hash(
                 log.warning(sanitize_log_message(f"🌐 Erro de conexão no HTML Monitor para '{url}' após {HTML_FETCH_MAX_RETRIES} tentativas: {e}"))
                 return url, "", ""
         except Exception as e:
-            last_error = e
             if attempt < HTML_FETCH_MAX_RETRIES - 1:
                 delay = HTML_FETCH_BACKOFF[attempt]
                 log.debug(f"HTML Monitor: retry em {delay}s para '{url}' (tentativa {attempt + 1}): {e}")
@@ -121,8 +128,10 @@ async def check_official_sites(
     new_state = current_state.copy()
     failures = full_state.setdefault("source_failures", {}) if full_state else {}
 
+    # Limita downloads concorrentes (antes: N sites baixados ao mesmo tempo, sem limite)
+    sem = asyncio.Semaphore(MAX_CONCURRENT_FEEDS)
     async with httpx.AsyncClient(headers=headers, timeout=30.0, verify=certifi.where()) as client:
-        tasks = [fetch_page_hash(client, url) for url in urls]
+        tasks = [fetch_page_hash(client, url, sem) for url in urls]
         results = await asyncio.gather(*tasks)
 
         for url, title, page_hash in results:
