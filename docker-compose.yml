@@ -18,6 +18,26 @@ services:
     # Usa diretório de dados para evitar "Is a directory" quando arquivos não existem no host
     environment:
       - DATA_DIR=/app/data
+      # Web bind em 0.0.0.0 DENTRO do container; publicado só no localhost do host (ports abaixo)
+      - WEB_HOST=0.0.0.0
+
+    # Dashboard web acessível só a partir do host (127.0.0.1) — nunca exposto à internet.
+    # Protegido por WEB_AUTH_TOKEN (definido no .env).
+    ports:
+      - "127.0.0.1:8080:8080"
+
+    # Hardening de container: dropa tudo e devolve só o necessário para o entrypoint
+    # fazer chown dos volumes e o gosu baixar privilégio (root -> gamebot).
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETUID
+      - SETGID
 
     # Volumes: um único diretório (o entrypoint cria config/state/history/sources se não existirem)
     volumes:
@@ -31,12 +51,10 @@ services:
         max-size: "10m"
         max-file: "3"
 
-    # Hardening de recursos (protege contra consumo excessivo de CPU/RAM)
-    deploy:
-      resources:
-        limits:
-          cpus: "0.80"
-          memory: 512M
+    # Hardening de recursos (protege contra consumo excessivo de CPU/RAM).
+    # mem_limit/cpus funcionam com `docker compose` v2 fora do Swarm (deploy.resources era ignorado).
+    mem_limit: 512m
+    cpus: 0.80
 
     # Política de restart
     # unless-stopped: reinicia sempre, exceto se parado manualmente
