@@ -52,7 +52,7 @@
 
 ### `/dashboard`
 
-**Descrição:** Abre painel visual interativo para configurar filtros e idioma.
+**Descrição:** Configura o canal atual e abre o painel de idioma. Observação: os filtros **por servidor** foram removidos — o bot envia todas as notícias que passam no filtro de ruído **global** (`LIXO_FILTER`). O painel hoje só troca o idioma (🇧🇷/🇺🇸).
 
 **Sintaxe:**
 ```
@@ -364,7 +364,7 @@ HTML: 8          HTML: 8
 
 **Bot não está enviando notícias:**
 1. Verifique se canal está configurado: `/status`
-2. Verifique se há filtros ativos: `/dashboard` → "Ver filtros"
+2. Confirme que o canal foi definido com `/set_canal` ou `/dashboard` (não há mais filtros por servidor a checar)
 3. Force uma varredura: `/forcecheck`
 
 **Notícias duplicadas:**

@@ -41,7 +41,7 @@ sudo sh get-docker.sh
 sudo usermod -aG docker $USER
 
 # Instalar Docker Compose
-sudo apt install docker-compose -y
+sudo apt install docker-compose-plugin -y   # v2: use 'docker compose' (com espaco), nao 'docker-compose' (v1)
 
 # Logout e login novamente para aplicar permissões
 exit
@@ -233,7 +233,7 @@ docker-compose up -d
 
 ### 💾 Logs crescendo muito
 
-**Configuração atual:** 3 arquivos de 10MB cada (rotação automática)
+**Configuração atual:** log da aplicação em `logs/bot.log` = 3 arquivos de 5MB (RotatingFileHandler); log do Docker (stdout) = 3 arquivos de 10MB (json-file). Ambos com rotação automática.
 
 **Limpar logs antigos manualmente:**
 
@@ -381,7 +381,7 @@ tar -xzf bot-games-full-backup.tar.gz
 
 # Instalar Docker (se necessário)
 curl -fsSL https://get.docker.com | sh
-sudo apt install docker-compose -y
+sudo apt install docker-compose-plugin -y   # v2: use 'docker compose' (com espaco), nao 'docker-compose' (v1)
 
 # Iniciar bot
 docker-compose up -d
@@ -486,7 +486,7 @@ O bot usa o diretório **`./data`** para persistir configuração e estado (evit
 
 | Recurso | Link |
 |---------|------|
-| 📖 **README Principal** | [readme.md](readme.md) |
+| 📖 **README Principal** | [README.md](../README.md) |
 | 📚 **Docker Docs** | [docs.docker.com](https://docs.docker.com) |
 | 💬 **Discord.py Docs** | [discordpy.readthedocs.io](https://discordpy.readthedocs.io) |
 

@@ -4,6 +4,36 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 
 ---
 
+## [2.2.0] - 2026-07-12 — Auditoria profunda (segurança, bugs, desempenho, testes)
+
+### Segurança
+- `.dockerignore` passa a excluir `.env`/`.env.*` (o token do Discord era assado na imagem via `COPY . .`)
+- `allowed_mentions.none()`: conteúdo de feed externo não dispara mais `@everyone`/`@here`
+- `/now` e o botão "Verificar Agora" agora exigem Administrador (antes qualquer membro forçava varredura)
+- Web: comparação de token constant-time (`hmac.compare_digest`); rota `/health` sem auth
+- `git_info` sem `shell=True`; remove IP interno vazado no embed de versão
+- Container: `no-new-privileges`, `cap_drop: ALL` (+ caps mínimas), dashboard publicado só em `127.0.0.1`
+
+### Correção
+- `except discord.InvalidArgument` (classe removida na discord.py 2.x) → `(ValueError, TypeError)`; antes abortava a varredura e causava repost
+- Auto-limpeza de 7 dias não zera mais o dedup inteiro (causava repost em massa); limita a 500/feed e poda caches órfãos
+- `state.json`: reload+merge antes do save final evita lost-update de chaves escritas por comandos durante o scan
+- Timestamp de embed sem data usa UTC (antes hora local rotulada como UTC); caps de tamanho pós-tradução
+- `storage`: `fsync` antes do `os.replace` (evita `state.json` truncado em queda de energia)
+
+### Desempenho
+- HTML Monitor: BeautifulSoup em executor (não bloqueia o event loop) + downloads limitados por semáforo
+- Tradução: reuso de instância `GoogleTranslator` + cache LRU (evita round-trips repetidos ao Google)
+- Filtro de ruído: uma alternância regex pré-compilada (era ~50 `re.search` por entrada)
+
+### Testes / Deps
+- Testa o filtro real (`should_skip_by_content`) e a atomicidade do `storage`; `clean_html` passa a testar a função real
+- Suíte deixa de derrubar o interpretador (skip dos testes web no CPython 3.14)
+- Dependências com piso acima de CVEs (aiohttp ≥3.10.11, jinja2 ≥3.1.6) e teto de major
+- `HEALTHCHECK` real via `/health` (antes só checava existência de `config.json`)
+
+---
+
 ## [2.1.4] - 2026-05-02
 
 ### Alterado
