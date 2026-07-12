@@ -55,14 +55,16 @@ Bot funcional e consciente de segurança (anti-SSRF com resolução DNS, autoriz
 
 ---
 
-## Pendências (ação do Paulo / próximo escopo)
+## Fase 2 (2026-07-12) — pendências resolvidas
 
-1. **Rotacionar `DISCORD_TOKEN` e `WEB_AUTH_TOKEN`** no Developer Portal (precaução — o token esteve em texto puro).
-2. **Recriar a venv com Python 3.11/3.12** (o 3.14 local tem `_ctypes` quebrado; remove os skips e o exit 139 de teardown).
-3. Refatorar `run_scan_once()` (~590 linhas) em `FeedFetcher`/`EntryFilter`/`EmbedBuilder`/`HtmlMonitorDispatcher`.
-4. Decidir sobre o legado Gundam/Gunpla em `get_news_metadata`/`LIXO_FILTER` (mantido por ora — decisão de escopo).
-5. Consolidar stack HTTP (aiohttp + httpx → só aiohttp).
-6. Finalizar i18n (respostas de admin/dashboard/status ainda hardcoded pt-BR; chaves EN já existem).
+1. **Rotação de tokens:** dispensável. `.env` nunca foi commitado (protegido) e o build Docker é local; a rotação só seria necessária se uma imagem já construída tivesse sido pushed a um registry compartilhado.
+2. **Venv recriada com Python 3.12** (o 3.14 local tinha `_ctypes` quebrado; achado em `%LOCALAPPDATA%\Programs\Python\Python312`). Deps instaladas; suíte agora **59 passed, 0 skipped, exit 0** — inclusive os testes web e de scanner antes pulados.
+3. **`run_scan_once()` decomposto** (~590 → ~464 linhas): extraídos `build_news_message()` (puro, testável) e `_run_html_monitor()`; +7 testes novos cobrindo construção de embed e dispatch de alerta (áreas antes sem cobertura).
+4. **httpx → aiohttp consolidado**: `html_monitor` e `add_sources_script` migrados; `httpx` removido do requirements (verificado: bot roda sem httpx instalado; `check_official_sites` buscou os 29 sites reais via aiohttp).
+5. **i18n:** decisão do Paulo — manter respostas de comando em pt-BR (bot é pt-BR single-user); notícias seguem traduzidas p/ o idioma do servidor. README ajustado para refletir isso.
+6. **Legado Gundam/Gunpla:** decisão do Paulo — **manter** a exclusão (ele tem um bot de Gundam separado; exclusão é intencional). Sem mudança de código.
+
+Verificação da Fase 2: 4 commits adicionais na `main` (venv não versionada); `import main` + suíte 59 passed na venv 3.12.
 
 ---
 
