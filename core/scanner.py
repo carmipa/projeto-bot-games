@@ -526,6 +526,193 @@ def get_news_metadata(title: str, url: str) -> tuple[str, discord.Color]:
     else:
         return ("", discord.Color.from_rgb(255, 0, 32)) # Standard Red
 
+def build_news_message(
+    bot: discord.Client,
+    entry: Any,
+    *,
+    t_translated: str,
+    s_translated: str,
+    link: str,
+    embed_color: "discord.Color",
+    pub_dt: datetime | None,
+    entry_image_url: str | None,
+    entry_video_url: str | None,
+    is_media: bool,
+    target_lang: str,
+) -> Tuple[str | None, "discord.Embed | None", "discord.ui.View"]:
+    """
+    Monta os artefatos de uma notícia (content, embed, view) SEM enviar — função pura,
+    testável isoladamente. Extraída de run_scan_once para reduzir o god-function e cobrir
+    a construção do embed com testes.
+    """
+    # Sem data no feed: usa agora em UTC (antes usava datetime.now() naive e rotulava como UTC)
+    embed_ts = pub_dt if pub_dt else datetime.now(timezone.utc)
+    if embed_ts.tzinfo is None:
+        embed_ts = embed_ts.replace(tzinfo=timezone.utc)
+
+    str_date = pub_dt.strftime("%d/%m/%Y %H:%M") if pub_dt else datetime.now().strftime("%d/%m/%Y %H:%M")
+    postado_str = f"🕒 **Postado em:** {str_date}"
+
+    # description tem limite de 4096 no Discord; a tradução pode expandir, então cortamos depois
+    embed = discord.Embed(
+        title=t_translated[:256],
+        description=f"{s_translated}\n\n{postado_str}"[:4096],
+        url=link,
+        color=embed_color,
+        timestamp=embed_ts,
+    )
+    author_name = t.get('embed.author', lang=target_lang)
+    icon_url = bot.user.avatar.url if bot.user and bot.user.avatar else None
+    embed.set_author(name=author_name, icon_url=icon_url)
+
+    source_domain = urlparse(link).netloc
+    footer_text = t.get('embed.source', lang=target_lang, source=source_domain)
+    if pub_dt:
+        date_str = pub_dt.strftime("%d/%m/%Y %H:%M")
+        footer_text = f"{footer_text} • {t.get('embed.published_at', lang=target_lang, date=date_str)}"
+    embed.set_footer(text=footer_text)
+
+    if entry_image_url:
+        embed.set_image(url=entry_image_url)
+    elif hasattr(entry, "media_thumbnail") and entry.media_thumbnail:
+        try:
+            thumb_url = entry.media_thumbnail[0].get("url")
+            if thumb_url:
+                embed.set_thumbnail(url=thumb_url)
+        except (IndexError, AttributeError, KeyError) as e:
+            log.debug(f"Erro ao obter thumbnail da entrada: {e}")
+        except Exception as e:
+            log.warning(f"Erro inesperado ao processar thumbnail: {e}")
+
+    # Se for mídia, mandamos o LINK no content (Discord gera player nativo) e não o embed
+    if is_media:
+        msg_content = f"📺 **{t_translated}**\n{link}\n\n{postado_str}"[:2000]
+        embed_to_send = None
+    else:
+        msg_content = None
+        embed_to_send = embed
+
+    # Botões de link: só http(s) — Discord rejeita mailto: e URLs > 512 chars
+    view = discord.ui.View(timeout=None)
+    read_url = safe_https_button_url(link)
+    if read_url:
+        view.add_item(discord.ui.Button(label="Leia Mais", url=read_url, emoji="📖", style=discord.ButtonStyle.link))
+    view.add_item(discord.ui.Button(label="WhatsApp", url=whatsapp_share_button_url(t_translated, link), emoji="🟢", style=discord.ButtonStyle.link))
+    view.add_item(discord.ui.Button(label="E-mail", url=gmail_compose_button_url(t_translated, link), emoji="✉️", style=discord.ButtonStyle.link))
+    if entry_video_url:
+        safe_video = safe_https_button_url(entry_video_url)
+        if safe_video:
+            view.add_item(discord.ui.Button(label="Assistir vídeo", url=safe_video, emoji="🎬", style=discord.ButtonStyle.link))
+
+    return msg_content, embed_to_send, view
+
+
+async def _run_html_monitor(
+    bot: discord.Client,
+    config: Dict[str, Any],
+    state: Dict[str, Any],
+    html_hashes: Dict[str, str],
+) -> int:
+    """
+    Verifica sites oficiais (HTML Watcher) e despacha alertas de mudança para cada guild.
+    Atualiza state['html_hashes']. Retorna o número de mensagens enviadas.
+    Extraído de run_scan_once para reduzir o god-function.
+    """
+    sent = 0
+    try:
+        log.info("🔎 Verificando sites oficiais (HTML Watcher)...")
+        html_updates, new_hashes = await check_official_sites(html_hashes, full_state=state)
+
+        if html_updates:
+            log.info(f"✨ {len(html_updates)} atualizações em sites oficiais detectadas!")
+            state["html_hashes"] = new_hashes
+            for update in html_updates:
+                u_title = update["title"]
+                u_link = update["link"]
+                u_summary = update.get("summary", "")
+
+                for gid, gdata in config.items():
+                    if not isinstance(gdata, dict):
+                        continue
+
+                    channel_id = gdata.get("channel_id")
+                    if not channel_id:
+                        continue
+
+                    try:
+                        channel = bot.get_channel(int(channel_id))
+                    except (ValueError, TypeError) as e:
+                        log.warning(
+                            f"[HTML Monitor] Canal inválido para guild {gid} (channel_id={channel_id}): {e}"
+                        )
+                        channel = None
+
+                    if not should_post_to_guild(str(gid), u_title, u_summary, config):
+                        log.debug(f"🛡️ [Filtro HTML] Guild {gid} bloqueou site: {u_title}")
+                        continue
+
+                    if channel:
+                        try:
+                            view = discord.ui.View(timeout=None)
+                            html_read = safe_https_button_url(u_link)
+                            if html_read:
+                                view.add_item(
+                                    discord.ui.Button(
+                                        label="Leia Mais",
+                                        url=html_read,
+                                        emoji="📖",
+                                        style=discord.ButtonStyle.link,
+                                    )
+                                )
+                            ul = str(u_link or "").strip()
+                            share_link = html_read or (
+                                ul[:LINK_BUTTON_URL_MAX]
+                                if ul.startswith(("http://", "https://"))
+                                else ""
+                            )
+                            if not share_link:
+                                share_link = "https://mail.google.com/mail/"
+                            view.add_item(
+                                discord.ui.Button(
+                                    label="WhatsApp",
+                                    url=whatsapp_share_button_url(u_title, share_link),
+                                    emoji="🟢",
+                                    style=discord.ButtonStyle.link,
+                                )
+                            )
+                            view.add_item(
+                                discord.ui.Button(
+                                    label="E-mail",
+                                    url=gmail_compose_button_url(u_title, share_link),
+                                    emoji="✉️",
+                                    style=discord.ButtonStyle.link,
+                                )
+                            )
+
+                            str_date = datetime.now().strftime("%d/%m/%Y %H:%M")
+                            post_text = f"🕒 **Postado em:** {str_date}"
+                            alert_msg = f"⚠️ **GameBot — Alerta**\n{u_title}\n{u_link}\n\n{post_text}"
+                            await channel.send(alert_msg[:2000], view=view)
+                            sent += 1
+                        except discord.Forbidden:
+                            log.error(
+                                f"[HTML Monitor] Sem permissão para enviar no canal {channel_id} (guild {gid})"
+                            )
+                        except discord.HTTPException as e:
+                            log.error(
+                                f"[HTML Monitor] Erro HTTP ao enviar alerta no canal {channel_id}: {e.status} - {e.text}"
+                            )
+        else:
+            if new_hashes != html_hashes:
+                state["html_hashes"] = new_hashes
+
+    except Exception as e:
+        log.exception(
+            f"❌ [HTML Monitor] Exceção ao verificar sites oficiais: {type(e).__name__}: {e}"
+        )
+    return sent
+
+
 # =========================================================
 # SCANNER LOGIC
 # =========================================================
@@ -923,103 +1110,20 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                             log.debug(f"Erro ao verificar domínio de mídia para '{link[:50]}...': {e}")
 
                         try:
-                            # Data/hora oficial da matéria ou vídeo (quando o feed fornece)
                             pub_dt = entry_dt if entry_dt else None
-                            # Sem data no feed: usa agora em UTC (antes usava datetime.now() naive
-                            # e rotulava como UTC → embed aparecia com offset errado, ex.: -3h no BRT)
-                            embed_ts = pub_dt if pub_dt else datetime.now(timezone.utc)
-                            # Discord exige datetime timezone-aware para timestamp do embed
-                            if embed_ts.tzinfo is None:
-                                embed_ts = embed_ts.replace(tzinfo=timezone.utc)
-
-                            # Data string para exibição
-                            str_date = pub_dt.strftime("%d/%m/%Y %H:%M") if pub_dt else datetime.now().strftime("%d/%m/%Y %H:%M")
-                            postado_str = f"🕒 **Postado em:** {str_date}"
-
-                            # Embed para notícias (description tem limite de 4096 no Discord;
-                            # a tradução pode expandir o texto, então cortamos após traduzir)
-                            embed = discord.Embed(
-                                title=t_translated[:256],
-                                description=f"{s_translated}\n\n{postado_str}"[:4096],
-                                url=link,
-                                color=embed_color,
-                                timestamp=embed_ts
+                            msg_content, embed_to_send, view = build_news_message(
+                                bot,
+                                entry,
+                                t_translated=t_translated,
+                                s_translated=s_translated,
+                                link=link,
+                                embed_color=embed_color,
+                                pub_dt=pub_dt,
+                                entry_image_url=entry_image_url,
+                                entry_video_url=entry_video_url,
+                                is_media=is_media,
+                                target_lang=target_lang,
                             )
-                            author_name = t.get('embed.author', lang=target_lang)
-                            # Usa avatar do bot se disponível
-                            icon_url = bot.user.avatar.url if bot.user and bot.user.avatar else None
-                            embed.set_author(name=author_name, icon_url=icon_url)
-
-                            source_domain = urlparse(link).netloc
-                            footer_text = t.get('embed.source', lang=target_lang, source=source_domain)
-                            if pub_dt:
-                                date_str = pub_dt.strftime("%d/%m/%Y %H:%M")
-                                footer_text = f"{footer_text} • {t.get('embed.published_at', lang=target_lang, date=date_str)}"
-                            embed.set_footer(text=footer_text)
-                            
-                            if entry_image_url:
-                                # Imagem grande no corpo do embed para artigos com capa.
-                                embed.set_image(url=entry_image_url)
-                            elif hasattr(entry, "media_thumbnail") and entry.media_thumbnail:
-                                try:
-                                    thumb_url = entry.media_thumbnail[0].get("url")
-                                    if thumb_url:
-                                        embed.set_thumbnail(url=thumb_url)
-                                except (IndexError, AttributeError, KeyError) as e:
-                                    log.debug(f"Erro ao obter thumbnail da entrada: {e}")
-                                except Exception as e:
-                                    log.warning(f"Erro inesperado ao processar thumbnail: {e}")
-                            
-                            # Se for mídia, mandamos o LINK no content para o Discord gerar o player nativo
-                            # E NÃO mandamos o embed, pois o Discord prioriza o embed sobre o player
-                            if is_media:
-                                # content tem limite de 2000 no Discord; corta após a tradução
-                                msg_content = f"📺 **{t_translated}**\n{link}\n\n{postado_str}"[:2000]
-                                embed_to_send = None
-                            else:
-                                msg_content = None
-                                embed_to_send = embed
-                            
-                            # Botões de link: só http(s) — Discord rejeita mailto: e URLs > 512 chars
-                            view = discord.ui.View(timeout=None)
-                            read_url = safe_https_button_url(link)
-                            if read_url:
-                                view.add_item(
-                                    discord.ui.Button(
-                                        label="Leia Mais",
-                                        url=read_url,
-                                        emoji="📖",
-                                        style=discord.ButtonStyle.link,
-                                    )
-                                )
-                            view.add_item(
-                                discord.ui.Button(
-                                    label="WhatsApp",
-                                    url=whatsapp_share_button_url(t_translated, link),
-                                    emoji="🟢",
-                                    style=discord.ButtonStyle.link,
-                                )
-                            )
-                            view.add_item(
-                                discord.ui.Button(
-                                    label="E-mail",
-                                    url=gmail_compose_button_url(t_translated, link),
-                                    emoji="✉️",
-                                    style=discord.ButtonStyle.link,
-                                )
-                            )
-                            # Quando o feed expõe vídeo direto (não YouTube), adiciona atalho explícito.
-                            if entry_video_url:
-                                safe_video = safe_https_button_url(entry_video_url)
-                                if safe_video:
-                                    view.add_item(
-                                        discord.ui.Button(
-                                            label="Assistir vídeo",
-                                            url=safe_video,
-                                            emoji="🎬",
-                                            style=discord.ButtonStyle.link,
-                                        )
-                                    )
 
                             await channel.send(content=msg_content, embed=embed_to_send, view=view)
 
@@ -1051,99 +1155,7 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
         # =========================================================
         # HTML MONITOR RUN (SITE WATCHER)
         # =========================================================
-        try:
-            log.info("🔎 Verificando sites oficiais (HTML Watcher)...")
-            # Passa apenas o dicionário de hashes para o monitor
-            # Se check_official_sites retornar updates, atualizamos o state principal
-            html_updates, new_hashes = await check_official_sites(html_hashes, full_state=state)
-            
-            if html_updates:
-                log.info(f"✨ {len(html_updates)} atualizações em sites oficiais detectadas!")
-                state["html_hashes"] = new_hashes
-                # Dispatch updates
-                for update in html_updates:
-                    u_title = update["title"]
-                    u_link = update["link"]
-                    u_summary = update.get("summary", "")
-                    
-                    for gid, gdata in config.items():
-                        if not isinstance(gdata, dict): continue
-                        
-                        channel_id = gdata.get("channel_id")
-                        if not channel_id: continue
-
-                        try:
-                            channel = bot.get_channel(int(channel_id))
-                        except (ValueError, TypeError) as e:
-                            log.warning(
-                                f"[HTML Monitor] Canal inválido para guild {gid} (channel_id={channel_id}): {e}"
-                            )
-                            channel = None
-                        
-                        # Aplica filtro por guild (canal configurado) também no monitor HTML
-                        if not should_post_to_guild(str(gid), u_title, u_summary, config):
-                            log.debug(f"🛡️ [Filtro HTML] Guild {gid} bloqueou site: {u_title}")
-                            continue
-
-                        if channel:
-                            try:
-                                view = discord.ui.View(timeout=None)
-                                html_read = safe_https_button_url(u_link)
-                                if html_read:
-                                    view.add_item(
-                                        discord.ui.Button(
-                                            label="Leia Mais",
-                                            url=html_read,
-                                            emoji="📖",
-                                            style=discord.ButtonStyle.link,
-                                        )
-                                    )
-                                ul = str(u_link or "").strip()
-                                share_link = html_read or (
-                                    ul[:LINK_BUTTON_URL_MAX]
-                                    if ul.startswith(("http://", "https://"))
-                                    else ""
-                                )
-                                if not share_link:
-                                    share_link = "https://mail.google.com/mail/"
-                                view.add_item(
-                                    discord.ui.Button(
-                                        label="WhatsApp",
-                                        url=whatsapp_share_button_url(u_title, share_link),
-                                        emoji="🟢",
-                                        style=discord.ButtonStyle.link,
-                                    )
-                                )
-                                view.add_item(
-                                    discord.ui.Button(
-                                        label="E-mail",
-                                        url=gmail_compose_button_url(u_title, share_link),
-                                        emoji="✉️",
-                                        style=discord.ButtonStyle.link,
-                                    )
-                                )
-
-                                str_date = datetime.now().strftime("%d/%m/%Y %H:%M")
-                                post_text = f"🕒 **Postado em:** {str_date}"
-                                alert_msg = f"⚠️ **GameBot — Alerta**\n{u_title}\n{u_link}\n\n{post_text}"
-                                await channel.send(alert_msg[:2000], view=view)
-                                sent_count += 1
-                            except discord.Forbidden:
-                                log.error(
-                                    f"[HTML Monitor] Sem permissão para enviar no canal {channel_id} (guild {gid})"
-                                )
-                            except discord.HTTPException as e:
-                                log.error(
-                                    f"[HTML Monitor] Erro HTTP ao enviar alerta no canal {channel_id}: {e.status} - {e.text}"
-                                )
-            else:
-                 if new_hashes != html_hashes:
-                     state["html_hashes"] = new_hashes
-                     
-        except Exception as e:
-            log.exception(
-                f"❌ [HTML Monitor] Exceção ao verificar sites oficiais: {type(e).__name__}: {e}"
-            )
+        sent_count += await _run_html_monitor(bot, config, state, html_hashes)
 
         # Salva TUDO em um único arquivo de forma atômica/safe
         save_history(history_list)
