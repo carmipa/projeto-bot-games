@@ -108,7 +108,7 @@ def validate_url(url: str, allowed_domains: Optional[List[str]] = None) -> Tuple
                 return False, f"O endereço '{netloc_without_port}' resolve para um IP privado ({resolved_ip}) e não é permitido."
     except socket.gaierror:
         # Se não resolver, pode ser um domínio inválido ou problemas de rede.
-        # Permitimos passar aqui pois a biblioteca HTTP (aiohttp/httpx) falhará na conexão.
+        # Permitimos passar aqui pois a biblioteca HTTP (aiohttp) falhará na conexão.
         pass
     except Exception as e:
         log.debug(f"Erro na resolução DNS para validação SSRF: {e}")

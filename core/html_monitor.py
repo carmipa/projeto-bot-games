@@ -4,13 +4,12 @@ HTML Monitor - Detects changes in static websites (e.g. game news sites).
 import ssl
 import logging
 import hashlib
-import random
 import certifi
-import httpx
+import aiohttp
 import asyncio
 from typing import List, Dict, Tuple
 from bs4 import BeautifulSoup
-from settings import BROWSER_USER_AGENTS, MAX_CONCURRENT_FEEDS
+from settings import MAX_CONCURRENT_FEEDS
 
 from utils.storage import p, load_json_safe, save_json_safe
 from utils.security import validate_url, sanitize_log_message
@@ -52,8 +51,18 @@ def _extract_title_and_hash(content: str) -> tuple[str, str]:
     return title, page_hash
 
 
+async def _get_page_content(
+    session: aiohttp.ClientSession, url: str, headers: Dict[str, str]
+) -> tuple[int, str | None]:
+    """GET com aiohttp; devolve (status, corpo ou None se != 200). Segue redirects."""
+    async with session.get(url, headers=headers, allow_redirects=True) as resp:
+        if resp.status != 200:
+            return resp.status, None
+        return resp.status, await resp.text()
+
+
 async def fetch_page_hash(
-    client: httpx.AsyncClient, url: str, sem: asyncio.Semaphore | None = None
+    session: aiohttp.ClientSession, url: str, sem: asyncio.Semaphore | None = None
 ) -> tuple[str, str, str]:
     """
     Fetches a page, cleans it, and returns (url, title, hash).
@@ -71,20 +80,19 @@ async def fetch_page_hash(
             headers = get_robust_headers()
             if sem is not None:
                 async with sem:
-                    resp = await client.get(url, follow_redirects=True, headers=headers)
+                    status, content = await _get_page_content(session, url, headers)
             else:
-                resp = await client.get(url, follow_redirects=True, headers=headers)
+                status, content = await _get_page_content(session, url, headers)
 
-            if resp.status_code != 200:
-                log.debug(f"HTML Monitor: {url} returned {resp.status_code}")
+            if content is None:
+                log.debug(f"HTML Monitor: {url} returned {status}")
                 return url, "", ""
 
-            content = resp.text
             loop = asyncio.get_running_loop()
             title, page_hash = await loop.run_in_executor(None, _extract_title_and_hash, content)
             return url, title, page_hash
 
-        except httpx.RequestError as e:
+        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
             if attempt < HTML_FETCH_MAX_RETRIES - 1:
                 delay = HTML_FETCH_BACKOFF[attempt]
                 log.debug(f"HTML Monitor: retry em {delay}s para '{url}' (tentativa {attempt + 1}): {e}")
@@ -130,8 +138,11 @@ async def check_official_sites(
 
     # Limita downloads concorrentes (antes: N sites baixados ao mesmo tempo, sem limite)
     sem = asyncio.Semaphore(MAX_CONCURRENT_FEEDS)
-    async with httpx.AsyncClient(headers=headers, timeout=30.0, verify=certifi.where()) as client:
-        tasks = [fetch_page_hash(client, url, sem) for url in urls]
+    ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+    connector = aiohttp.TCPConnector(ssl=ssl_ctx)
+    timeout = aiohttp.ClientTimeout(total=30)
+    async with aiohttp.ClientSession(headers=headers, timeout=timeout, connector=connector) as session:
+        tasks = [fetch_page_hash(session, url, sem) for url in urls]
         results = await asyncio.gather(*tasks)
 
         for url, title, page_hash in results:

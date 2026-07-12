@@ -5,7 +5,7 @@ Executar a partir da raiz: python scripts/add_sources_script.py
 import json
 import os
 import asyncio
-import httpx
+import aiohttp
 import re
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qs
@@ -46,21 +46,22 @@ async def get_youtube_rss_url(client, url):
             return f"https://www.youtube.com/feeds/videos.xml?channel_id={path_parts[1]}"
             
         print(f"🕵️ Fetching YouTube Channel ID for: {url}")
-        resp = await client.get(url, follow_redirects=True)
-        resp.raise_for_status()
-        
+        async with client.get(url, allow_redirects=True) as resp:
+            resp.raise_for_status()
+            text = await resp.text()
+
         # Try to find channel_id in meta tags or canonical URL
-        soup = BeautifulSoup(resp.text, 'html.parser')
-        
+        soup = BeautifulSoup(text, 'html.parser')
+
         # Meta tag search
         meta_id = soup.find("meta", itemprop="channelId")
         if meta_id:
             channel_id = meta_id["content"]
             print(f"   ✅ Found Channel ID (meta): {channel_id}")
             return f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
-            
+
         # Regex search in scripts (fallback)
-        id_match = re.search(r'"channelId":"(UC[\w-]+)"', resp.text)
+        id_match = re.search(r'"channelId":"(UC[\w-]+)"', text)
         if id_match:
             channel_id = id_match.group(1)
             print(f"   ✅ Found Channel ID (regex): {channel_id}")
@@ -95,7 +96,7 @@ async def main():
     
     tasks = []
     
-    async with httpx.AsyncClient(headers=HEADERS, timeout=15.0) as client:
+    async with aiohttp.ClientSession(headers=HEADERS, timeout=aiohttp.ClientTimeout(total=15)) as client:
         for url in NEW_URLS:
             clean_url = normalize_url(url)
             
