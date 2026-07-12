@@ -6,6 +6,30 @@ import os
 import sys
 import asyncio
 
+import pytest
+
+# aiohttp TestServer + asyncio.run derruba o interpretador (access violation) no CPython 3.14.
+# Produção roda 3.10 e dev deveria usar 3.11/3.12 — pulamos só nesse interpretador problemático
+# para a suíte não abortar inteira em vez de reportar pass/fail.
+_WEB_TESTS_UNSAFE = sys.version_info >= (3, 14)
+_skip_web = pytest.mark.skipif(
+    _WEB_TESTS_UNSAFE,
+    reason="aiohttp TestServer instável no CPython 3.14 (use 3.11/3.12 em dev)",
+)
+
+# Alguns testes importam core.scanner -> discord.py -> ctypes. Se o interpretador não
+# consegue importar discord (ex.: venv 3.14 com _ctypes quebrado), pulamos em vez de
+# reportar falha. Em produção (3.10) e CI (3.11) roda normalmente.
+try:
+    import discord  # noqa: F401
+    _DISCORD_OK = True
+except Exception:
+    _DISCORD_OK = False
+_skip_no_discord = pytest.mark.skipif(
+    not _DISCORD_OK,
+    reason="discord.py indisponível neste interpretador (recrie a venv com Python 3.11/3.12)",
+)
+
 # Garante import a partir da raiz
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if ROOT not in sys.path:
@@ -15,6 +39,7 @@ os.chdir(ROOT)
 
 # ============== Integração: Storage + Sources ==============
 
+@_skip_no_discord
 def test_integration_load_sources_from_json():
     """Carrega sources.json e verifica que retorna lista de URLs válidas."""
     from core.scanner import load_sources
@@ -72,6 +97,7 @@ def _web_routes_without_auth(monkeypatch):
     return ws.routes
 
 
+@_skip_web
 def test_integration_web_index_returns_200(monkeypatch):
     """Servidor web: GET / retorna 200 e HTML."""
     from aiohttp import web
@@ -97,6 +123,7 @@ def test_integration_web_index_returns_200(monkeypatch):
     asyncio.run(_run())
 
 
+@_skip_web
 def test_integration_web_api_stats_structure(monkeypatch):
     """Servidor web: GET /api/stats retorna JSON com campos esperados (sem auth)."""
     from aiohttp import web
@@ -126,6 +153,7 @@ def test_integration_web_api_stats_structure(monkeypatch):
 
 # ============== Integração: Scanner (run_scan_once com mock) ==============
 
+@_skip_no_discord
 def test_integration_run_scan_once_with_empty_config():
     """run_scan_once com config vazio/sem channel_id retorna sem erro (não faz HTTP)."""
     from core.scanner import run_scan_once
@@ -143,6 +171,7 @@ def test_integration_run_scan_once_with_empty_config():
     assert True
 
 
+@_skip_no_discord
 def test_integration_sanitize_link():
     """sanitize_link remove UTM e preserva links do YouTube."""
     from core.scanner import sanitize_link

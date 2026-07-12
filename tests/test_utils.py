@@ -2,19 +2,9 @@
 Testes para as funções utilitárias do bot.
 Estes testes NÃO importam main.py para evitar dependência do Discord token.
 """
-import re
-
-
-# Cópia das funções para testar (sem depender de main.py)
-def clean_html(raw_html: str) -> str:
-    """Remove tags HTML e entidades; normaliza espaços."""
-    if not raw_html:
-        return ""
-    _HTML_RE = re.compile(r"<.*?>|&([a-z0-9]+|#[0-9]{1,6});", flags=re.IGNORECASE)
-    _WS_RE = re.compile(r"\s+")
-    txt = re.sub(_HTML_RE, " ", raw_html)
-    txt = re.sub(_WS_RE, " ", txt).strip()
-    return txt
+# Importa a função REAL de produção (antes: testava uma cópia local que podia divergir
+# silenciosamente da implementação em utils/html.py).
+from utils.html import clean_html
 
 
 def test_clean_html_basic():
