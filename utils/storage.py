@@ -85,6 +85,10 @@ def save_json_safe(filepath: str, data: Any) -> None:
             os.makedirs(parent, exist_ok=True)
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
+            # Garante que os dados foram para o disco antes do rename (evita arquivo
+            # truncado/vazio em queda de energia ou crash do kernel num container 24/7)
+            f.flush()
+            os.fsync(f.fileno())
         # Atômico: replace sobrescreve o destino; em crash o .tmp fica, o original intacto
         os.replace(tmp, filepath)
     except PermissionError as e:

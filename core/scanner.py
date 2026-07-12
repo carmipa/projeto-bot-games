@@ -42,7 +42,7 @@ from settings import (
 )
 from utils.storage import p, load_json_safe, save_json_safe
 from utils.html import clean_html
-from utils.cache import load_http_state, save_http_state, get_cache_headers, update_cache_state
+from utils.cache import get_cache_headers, update_cache_state
 from utils.translator import translate_to_target, t
 from utils.security import validate_url, sanitize_log_message
 from utils.http import get_robust_headers
@@ -61,6 +61,10 @@ log = logging.getLogger("GameBot")
 # Lock global para impedir varreduras simultâneas
 scan_lock = asyncio.Lock()
 _runtime_profile_logged = False
+
+# Máximo de links mantidos no dedup por feed (limita o crescimento de state.json sem
+# zerar tudo — o wipe total antigo causava repost em massa a cada 7 dias)
+MAX_DEDUP_PER_FEED = 500
 
 GENERIC_YOUTUBE_HINTS = (
     "youtube.com/feeds/videos.xml?channel_id=",
@@ -484,8 +488,8 @@ async def extract_og_image_safe(session: aiohttp.ClientSession, article_url: str
         r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+name=["\']twitter:image["\']',
     ]
     image_url = None
-    for p in patterns:
-        m = re.search(p, html, re.IGNORECASE)
+    for pat in patterns:
+        m = re.search(pat, html, re.IGNORECASE)
         if m:
             image_url = m.group(1).strip()
             break
@@ -615,10 +619,23 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
         CLEANUP_INTERVAL = 604800  # 7 dias em segundos
 
         if now_ts - last_clean > CLEANUP_INTERVAL:
-            log.info("🧹 [Auto-Cleanup] Executando limpeza de cache (Ciclo de 7 dias)")
-            state["dedup"] = {}  # Limpa histórico de mensagens enviadas para forçar refresh se necessário
+            log.info("🧹 [Auto-Cleanup] Limitando dedup e podando caches órfãos (Ciclo de 7 dias)")
+            # NÃO zera mais o dedup inteiro (o wipe causava repost em massa). Apenas limita
+            # o tamanho de cada balde aos últimos MAX_DEDUP_PER_FEED links.
+            dedup_map = state.get("dedup", {})
+            if isinstance(dedup_map, dict):
+                for _links in dedup_map.values():
+                    if isinstance(_links, list) and len(_links) > MAX_DEDUP_PER_FEED:
+                        del _links[:-MAX_DEDUP_PER_FEED]
+            # Poda entradas órfãs (fontes que não existem mais). No pior caso força um refetch,
+            # nunca um repost — por isso é seguro remover.
+            active_urls = set(load_sources()) | set(state.get("youtube_feed_cache", {}).values())
+            for bucket_name in ("http_cache", "source_failures"):
+                bucket = state.get(bucket_name, {})
+                if isinstance(bucket, dict):
+                    for dead in [k for k in list(bucket.keys()) if k not in active_urls]:
+                        del bucket[dead]
             state["last_cleanup"] = now_ts
-            # Nota: Não limpamos http_cache para manter eficiência, apenas o dedup de posts
         
         # Referências locais para facilitar acesso
         http_cache = state["http_cache"]
@@ -908,7 +925,9 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                         try:
                             # Data/hora oficial da matéria ou vídeo (quando o feed fornece)
                             pub_dt = entry_dt if entry_dt else None
-                            embed_ts = pub_dt if pub_dt else datetime.now()
+                            # Sem data no feed: usa agora em UTC (antes usava datetime.now() naive
+                            # e rotulava como UTC → embed aparecia com offset errado, ex.: -3h no BRT)
+                            embed_ts = pub_dt if pub_dt else datetime.now(timezone.utc)
                             # Discord exige datetime timezone-aware para timestamp do embed
                             if embed_ts.tzinfo is None:
                                 embed_ts = embed_ts.replace(tzinfo=timezone.utc)
@@ -917,10 +936,11 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                             str_date = pub_dt.strftime("%d/%m/%Y %H:%M") if pub_dt else datetime.now().strftime("%d/%m/%Y %H:%M")
                             postado_str = f"🕒 **Postado em:** {str_date}"
 
-                            # Embed para notícias
+                            # Embed para notícias (description tem limite de 4096 no Discord;
+                            # a tradução pode expandir o texto, então cortamos após traduzir)
                             embed = discord.Embed(
                                 title=t_translated[:256],
-                                description=f"{s_translated}\n\n{postado_str}",
+                                description=f"{s_translated}\n\n{postado_str}"[:4096],
                                 url=link,
                                 color=embed_color,
                                 timestamp=embed_ts
@@ -953,7 +973,8 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                             # Se for mídia, mandamos o LINK no content para o Discord gerar o player nativo
                             # E NÃO mandamos o embed, pois o Discord prioriza o embed sobre o player
                             if is_media:
-                                msg_content = f"📺 **{t_translated}**\n{link}\n\n{postado_str}"
+                                # content tem limite de 2000 no Discord; corta após a tradução
+                                msg_content = f"📺 **{t_translated}**\n{link}\n\n{postado_str}"[:2000]
                                 embed_to_send = None
                             else:
                                 msg_content = None
@@ -1014,8 +1035,10 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                             log.error(f"🚫 Sem permissão para enviar mensagem no canal {channel_id} (guild {gid}): {e}")
                         except discord.HTTPException as e:
                             log.error(f"🌐 Erro HTTP ao enviar mensagem no canal {channel_id}: {e.status} - {e.text}")
-                        except discord.InvalidArgument as e:
-                            log.error(f"⚠️ Argumento inválido ao criar embed/mensagem: {e}")
+                        except (ValueError, TypeError) as e:
+                            # discord.py 2.x removeu discord.InvalidArgument; embed/botão inválido
+                            # lança ValueError/TypeError. Sem este catch, o erro abortava a varredura.
+                            log.error(f"⚠️ Argumento inválido ao criar embed/mensagem: {type(e).__name__}: {e}")
                         except Exception as e:
                             log.exception(f"❌ Falha inesperada ao enviar no canal {channel_id} (guild {gid}): {type(e).__name__}: {e}")
 
@@ -1102,7 +1125,8 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
 
                                 str_date = datetime.now().strftime("%d/%m/%Y %H:%M")
                                 post_text = f"🕒 **Postado em:** {str_date}"
-                                await channel.send(f"⚠️ **GameBot — Alerta**\n{u_title}\n{u_link}\n\n{post_text}", view=view)
+                                alert_msg = f"⚠️ **GameBot — Alerta**\n{u_title}\n{u_link}\n\n{post_text}"
+                                await channel.send(alert_msg[:2000], view=view)
                                 sent_count += 1
                             except discord.Forbidden:
                                 log.error(
@@ -1123,8 +1147,16 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
 
         # Salva TUDO em um único arquivo de forma atômica/safe
         save_history(history_list)
+        # Recarrega o state do disco e preserva chaves escritas por comandos DURANTE o scan
+        # (ex.: last_announced_hash gravado pelo main.py). A varredura só é dona destas chaves;
+        # o resto é mesclado do disco para não sofrer lost-update numa janela de até 125 min.
+        _scan_owned = ("dedup", "http_cache", "html_hashes", "youtube_feed_cache", "source_failures", "last_cleanup")
+        disk_state = load_json_safe(state_file, {})
+        if isinstance(disk_state, dict):
+            for _k, _v in disk_state.items():
+                if _k not in _scan_owned:
+                    state[_k] = _v
         save_json_safe(state_file, state)
-        # Removido save_http_state duplicado que causava race condition
         
         stats.scans_completed += 1
         stats.news_posted += sent_count
