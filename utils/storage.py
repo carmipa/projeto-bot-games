@@ -173,10 +173,17 @@ def get_state_stats(state: Dict[str, Any]) -> Dict[str, Any]:
         "dedup_total_links": 0,
         "http_cache_urls": 0,
         "html_hashes_sites": 0,
+        "youtube_feed_cache": 0,
+        "source_failures": 0,
         "last_cleanup": None,
         "last_announced_hash": state.get("last_announced_hash"),
         "file_size_kb": 0
     }
+
+    for chave in ("youtube_feed_cache", "source_failures"):
+        valor = state.get(chave, {})
+        if isinstance(valor, dict):
+            stats[chave] = len(valor)
     
     # Estatísticas de dedup
     dedup = state.get("dedup", {})
@@ -209,41 +216,71 @@ def get_state_stats(state: Dict[str, Any]) -> Dict[str, Any]:
     return stats
 
 
+# Chaves de dados que o scanner escreve em state.json e que uma limpeza precisa conhecer.
+# `_METADADOS_PRESERVADOS` é o oposto: sobrevive até a um "tudo", de propósito.
+# Toda chave nova em state.json TEM de entrar numa destas duas listas — a guarda em
+# tests/test_clean_state_chaves.py falha se alguém acrescentar estado sem classificar.
+CHAVES_LIMPAVEIS = ("dedup", "http_cache", "html_hashes", "youtube_feed_cache", "source_failures")
+METADADOS_PRESERVADOS = ("last_cleanup", "last_announced_hash")
+
+
 def clean_state(state: Dict[str, Any], clean_type: str) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """
-    Limpa partes específicas do state.json.
-    
+    PROPÓSITO DE NEGÓCIO: dar ao administrador uma forma cirúrgica de zerar partes do
+    estado do bot — repostar de propósito, forçar refetch quando um feed muda de formato,
+    ou reinicializar o monitor de sites — sem apagar o ficheiro inteiro à mão.
+
+    INVARIANTES DO DOMÍNIO: `tudo` significa tudo. `youtube_feed_cache` e
+    `source_failures` eram ignorados por esta função: o "tudo" deixava para trás
+    resoluções de canal em cache (que podiam apontar para o canal errado) e contadores de
+    falha antigos, e o relatório dizia que estava limpo. `html_hashes` e
+    `youtube_feed_cache` andam juntos com o refetch; `last_cleanup` e
+    `last_announced_hash` são metadados e sobrevivem a qualquer limpeza, para não
+    disparar auto-limpeza nem reanunciar a versão.
+
+    COMPORTAMENTO EM CASO DE FALHA: `clean_type` desconhecido levanta `ValueError` e não
+    devolve estado nenhum — o comando aborta antes de gravar. O dicionário original nunca
+    é mutado: trabalha-se sobre uma cópia rasa e as chaves limpas são substituídas.
+
     Args:
         state: Estado atual do state.json
-        clean_type: Tipo de limpeza ('dedup', 'http_cache', 'html_hashes', 'tudo')
-    
+        clean_type: 'dedup', 'http_cache', 'html_hashes', 'youtube_feed_cache' ou 'tudo'
+
     Returns:
         Tupla (novo_state, stats_antes)
     """
     stats_before = get_state_stats(state)
     new_state = state.copy()
-    
+
     if clean_type == "dedup":
         new_state["dedup"] = {}
         log.info("🧹 Limpeza: dedup removido")
-    
+
     elif clean_type == "http_cache":
         new_state["http_cache"] = {}
         log.info("🧹 Limpeza: http_cache removido")
-    
+
     elif clean_type == "html_hashes":
         new_state["html_hashes"] = {}
         log.info("🧹 Limpeza: html_hashes removido")
-    
+
+    elif clean_type == "youtube_feed_cache":
+        # Também zera source_failures: uma resolução errada em cache costuma vir
+        # acompanhada de contadores de falha da URL antiga, que deixam de fazer sentido.
+        new_state["youtube_feed_cache"] = {}
+        new_state["source_failures"] = {}
+        log.info("🧹 Limpeza: youtube_feed_cache e source_failures removidos")
+
     elif clean_type == "tudo":
-        # Limpa tudo exceto last_cleanup e last_announced_hash
-        new_state["dedup"] = {}
-        new_state["http_cache"] = {}
-        new_state["html_hashes"] = {}
-        # Mantém last_cleanup e last_announced_hash
-        log.info("🧹 Limpeza: tudo removido (exceto metadados)")
-    
+        for chave in CHAVES_LIMPAVEIS:
+            new_state[chave] = {}
+        log.info(
+            "🧹 Limpeza: tudo removido (%s) — preservados: %s",
+            ", ".join(CHAVES_LIMPAVEIS),
+            ", ".join(METADADOS_PRESERVADOS),
+        )
+
     else:
         raise ValueError(f"Tipo de limpeza inválido: {clean_type}")
-    
+
     return new_state, stats_before

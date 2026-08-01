@@ -8,6 +8,7 @@ import logging
 import os
 from datetime import datetime
 
+from core.scanner import scan_lock
 from utils.storage import p, load_json_safe, save_json_safe, create_backup, get_state_stats, clean_state
 
 log = logging.getLogger("GameBot")
@@ -72,6 +73,7 @@ class AdminCog(commands.Cog):
         app_commands.Choice(name="🧹 Dedup (Histórico de links)", value="dedup"),
         app_commands.Choice(name="🌐 HTTP Cache (ETags)", value="http_cache"),
         app_commands.Choice(name="🔍 HTML Hashes (Monitor de sites)", value="html_hashes"),
+        app_commands.Choice(name="📺 Cache de canais YouTube + falhas", value="youtube_feed_cache"),
         app_commands.Choice(name="⚠️ TUDO (Limpa tudo)", value="tudo"),
     ])
     @app_commands.checks.has_permissions(administrator=True)
@@ -112,15 +114,17 @@ class AdminCog(commands.Cog):
                 "dedup": "🧹 **Dedup** (Histórico de links enviados)",
                 "http_cache": "🌐 **HTTP Cache** (ETags e Last-Modified)",
                 "html_hashes": "🔍 **HTML Hashes** (Monitoramento de sites)",
+                "youtube_feed_cache": "📺 **Cache de canais YouTube** (+ contadores de falha)",
                 "tudo": "⚠️ **TUDO** (Limpa tudo exceto metadados)"
             }
             tipo_desc = tipo_desc_map.get(tipo, tipo)
-            
+
             # Avisos por tipo
             avisos = {
                 "dedup": "⚠️ **ATENÇÃO:** Isso fará o bot repostar notícias já enviadas!",
                 "http_cache": "ℹ️ Isso aumentará requisições HTTP, mas não causará repostagem.",
                 "html_hashes": "⚠️ **ATENÇÃO:** Sites HTML serão detectados como 'mudados' novamente!",
+                "youtube_feed_cache": "ℹ️ Força o bot a resolver os canais do YouTube de novo. Sem repostagem.",
                 "tudo": "🚨 **ATENÇÃO CRÍTICA:** Isso limpará TUDO e pode causar repostagem em massa!"
             }.get(tipo, "")
             
@@ -136,6 +140,8 @@ class AdminCog(commands.Cog):
                     f"**Dedup:** {stats['dedup_feeds']} feeds, {stats['dedup_total_links']} links\n"
                     f"**HTTP Cache:** {stats['http_cache_urls']} URLs\n"
                     f"**HTML Hashes:** {stats['html_hashes_sites']} sites\n"
+                    f"**Canais YouTube em cache:** {stats['youtube_feed_cache']}\n"
+                    f"**Fontes com falha registrada:** {stats['source_failures']}\n"
                     f"**Tamanho:** {file_size:.1f} KB"
                 ),
                 inline=False
@@ -161,37 +167,54 @@ class AdminCog(commands.Cog):
         
         # Confirmação recebida - procede com limpeza
         try:
-            state_file = p("state.json")
-            state = load_json_safe(state_file, {})
-            
-            if not state:
+            # A varredura pode durar até 125 min e, ao terminar, grava o state que tem em
+            # memória. Sem esta trava, uma limpeza no meio de uma varredura era desfeita
+            # em silêncio pelo save final — o admin via "limpeza concluída" e nada mudava.
+            if scan_lock.locked():
                 await interaction.followup.send(
-                    "⚠️ state.json está vazio ou não existe.",
+                    "⏳ Há uma varredura em andamento. A limpeza foi **cancelada** para não "
+                    "ser desfeita pelo salvamento final da varredura. Tente novamente quando "
+                    "ela terminar (veja `/status`).",
                     ephemeral=True
                 )
-                return
-            
-            # Estatísticas antes
-            stats_before = get_state_stats(state)
-            
-            # Cria backup antes de limpar
-            backup_path = create_backup(state_file)
-            if not backup_path:
-                await interaction.followup.send(
-                    "❌ Falha ao criar backup. Limpeza cancelada por segurança.",
-                    ephemeral=True
+                log.warning(
+                    f"[AUDIT] STATE_CLEAN_ABORTADO | User: {interaction.user} | "
+                    f"Type: {tipo} | Motivo: varredura em andamento"
                 )
                 return
-            
-            # Limpa state
-            new_state, _ = clean_state(state, tipo)
-            
-            # Salva novo state
-            save_json_safe(state_file, new_state)
-            
+
+            async with scan_lock:
+                state_file = p("state.json")
+                state = load_json_safe(state_file, {})
+
+                if not state:
+                    await interaction.followup.send(
+                        "⚠️ state.json está vazio ou não existe.",
+                        ephemeral=True
+                    )
+                    return
+
+                # Estatísticas antes
+                stats_before = get_state_stats(state)
+
+                # Cria backup antes de limpar
+                backup_path = create_backup(state_file)
+                if not backup_path:
+                    await interaction.followup.send(
+                        "❌ Falha ao criar backup. Limpeza cancelada por segurança.",
+                        ephemeral=True
+                    )
+                    return
+
+                # Limpa state
+                new_state, _ = clean_state(state, tipo)
+
+                # Salva novo state
+                save_json_safe(state_file, new_state)
+
             # Estatísticas depois
             stats_after = get_state_stats(new_state)
-            
+
             # Log de auditoria
             log.info(
                 f"[AUDIT] STATE_CLEANED | User: {interaction.user} (ID: {interaction.user.id}) | "
@@ -210,6 +233,7 @@ class AdminCog(commands.Cog):
                 "dedup": "🧹 Dedup (Histórico de links)",
                 "http_cache": "🌐 HTTP Cache (ETags)",
                 "html_hashes": "🔍 HTML Hashes (Monitor de sites)",
+                "youtube_feed_cache": "📺 Cache de canais YouTube + falhas",
                 "tudo": "⚠️ TUDO (Limpa tudo)"
             }
             tipo_desc = tipo_desc_map.get(tipo, tipo)
@@ -225,7 +249,9 @@ class AdminCog(commands.Cog):
                 value=(
                     f"Dedup: {stats_before['dedup_total_links']} links\n"
                     f"HTTP Cache: {stats_before['http_cache_urls']} URLs\n"
-                    f"HTML Hashes: {stats_before['html_hashes_sites']} sites"
+                    f"HTML Hashes: {stats_before['html_hashes_sites']} sites\n"
+                    f"Canais YT: {stats_before['youtube_feed_cache']}\n"
+                    f"Falhas: {stats_before['source_failures']}"
                 ),
                 inline=True
             )
@@ -235,7 +261,9 @@ class AdminCog(commands.Cog):
                 value=(
                     f"Dedup: {stats_after['dedup_total_links']} links\n"
                     f"HTTP Cache: {stats_after['http_cache_urls']} URLs\n"
-                    f"HTML Hashes: {stats_after['html_hashes_sites']} sites"
+                    f"HTML Hashes: {stats_after['html_hashes_sites']} sites\n"
+                    f"Canais YT: {stats_after['youtube_feed_cache']}\n"
+                    f"Falhas: {stats_after['source_failures']}"
                 ),
                 inline=True
             )

@@ -135,41 +135,61 @@ def validate_url(url: str, allowed_domains: Optional[List[str]] = None) -> Tuple
     return True, None
 
 
+# Padrões ANCORADOS de segredo. Cada um exige um rótulo, um cabeçalho ou uma forma
+# estrutural — nunca "sequência longa qualquer".
+_PADROES_SENSIVEIS = [
+    # token=..., secret: ..., api_key = ..., password=...
+    # O valor para em espaço OU em '&': senão, num `?token=x&y=1`, o \S+ engolia o resto
+    # da query string e o log perdia parâmetros que não são segredo.
+    (re.compile(r'(?i)\b(discord[_-]?token|api[_-]?key|access[_-]?token|token|password|senha|secret|webhook[_-]?url)\b\s*[:=]\s*[^\s&]+'),
+     r'\1=[REDACTED]'),
+    # Authorization: Bearer xxx  /  Authorization: Bot xxx
+    (re.compile(r'(?i)\b(authorization\s*:\s*)(bearer|bot)\s+\S+'), r'\1\2 [REDACTED]'),
+    # Forma estrutural de um bot token do Discord: base64.base64.base64
+    (re.compile(r'\b[A-Za-z0-9_-]{23,28}\.[A-Za-z0-9_-]{6}\.[A-Za-z0-9_-]{27,}\b'), '[REDACTED]'),
+    # Webhook do Discord (o path contém o segredo)
+    (re.compile(r'(?i)(https?://(?:\w+\.)?discord(?:app)?\.com/api/webhooks/)\S+'), r'\1[REDACTED]'),
+    # Segredo em query string: ?token=... &key=... &secret=...
+    (re.compile(r'(?i)([?&](?:token|key|api[_-]?key|secret|password|auth)=)[^&\s]+'), r'\1[REDACTED]'),
+]
+
+
 def sanitize_log_message(message: str, sensitive_patterns: Optional[List[str]] = None) -> str:
     """
-    Remove informações sensíveis de mensagens de log.
-    
+    PROPÓSITO DE NEGÓCIO: impedir que o token do Discord, o token do dashboard web ou uma
+    URL de webhook acabem gravados em `logs/bot.log`, que não é secreto e viaja em
+    relatórios e capturas de ecrã.
+
+    INVARIANTES DO DOMÍNIO: só mascara o que tem forma ou rótulo de segredo. A regra
+    anterior (`[a-zA-Z0-9_-]{20,}` truncado para 8 caracteres) mascarava QUALQUER
+    sequência longa: um `channel_id` do YouTube virava `UCKy1dAq...` e o diagnóstico de
+    fonte morta ficava ilegível — protegendo zero segredos que os padrões rotulados já
+    não cubram. Nenhum padrão aqui pode depender apenas de comprimento.
+
+    COMPORTAMENTO EM CASO DE FALHA: mensagem vazia/None devolve string vazia. Um padrão
+    customizado inválido levanta `re.error` do próprio `re` — é erro de programação de
+    quem chamou, não se mascara. A função nunca descarta a mensagem: no pior caso devolve
+    o texto original inalterado.
+
     Args:
         message: Mensagem de log original
-        sensitive_patterns: Lista opcional de padrões regex para mascarar
-    
+        sensitive_patterns: Lista opcional de padrões regex adicionais para mascarar
+
     Returns:
         Mensagem sanitizada
     """
     if not message:
         return ""
-    
-    # Padrões padrão de informações sensíveis
-    default_patterns = [
-        (r'(?i)(token|password|secret|key|api[_-]?key)\s*[:=]\s*([^\s]+)', r'\1: [REDACTED]'),
-        (r'(?i)(discord[_-]?token)\s*[:=]\s*([^\s]+)', r'\1: [REDACTED]'),
-        (r'([a-zA-Z0-9_-]{20,})', lambda m: m.group(0)[:8] + "..." if len(m.group(0)) > 20 else m.group(0)),  # Tokens longos
-    ]
-    
+
     sanitized = message
-    
-    # Aplica padrões padrão
-    for pattern, replacement in default_patterns:
-        if callable(replacement):
-            sanitized = re.sub(pattern, replacement, sanitized)
-        else:
-            sanitized = re.sub(pattern, replacement, sanitized)
-    
+    for pattern, replacement in _PADROES_SENSIVEIS:
+        sanitized = pattern.sub(replacement, sanitized)
+
     # Aplica padrões customizados se fornecidos
     if sensitive_patterns:
         for pattern in sensitive_patterns:
             sanitized = re.sub(pattern, "[REDACTED]", sanitized, flags=re.IGNORECASE)
-    
+
     return sanitized
 
 

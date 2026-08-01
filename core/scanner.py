@@ -1283,9 +1283,30 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
 loop_task = None
 
 def start_scheduler(bot: discord.Client):
-    """Inicia o loop agendado."""
+    """
+    PROPÓSITO DE NEGÓCIO: pôr de pé o agendador que dispara a varredura de notícias de
+    tempos em tempos. É chamado do `on_ready`, que o discord.py reexecuta a cada
+    reconexão do gateway — não apenas no arranque.
+
+    INVARIANTES DO DOMÍNIO: existe no máximo UM loop de varredura vivo por processo.
+    Como o `@tasks.loop` é declarado dentro desta função, cada chamada criava um objeto
+    `Loop` novo — não havia o `RuntimeError` de "already launched" que protegeria um loop
+    de módulo, o loop anterior não era cancelado e o global só perdia a referência.
+    Medido: duas chamadas => 2 tasks `news_scan_loop` ativas, uma por reconexão.
+
+    COMPORTAMENTO EM CASO DE FALHA: se já houver loop em execução, não cria outro nem
+    levanta exceção — regista em log e devolve o controlo, deixando o agendador existente
+    intacto. Nunca interrompe o `on_ready` (o anúncio de versão vem logo a seguir).
+    """
     global loop_task
-    
+
+    if loop_task is not None and loop_task.is_running():
+        log.info(
+            "🔄 [Scheduler] Agendador já em execução (on_ready repetido por reconexão). "
+            "Mantendo o loop atual."
+        )
+        return
+
     @tasks.loop(minutes=LOOP_MINUTES)
     async def news_scan_loop():
         try:

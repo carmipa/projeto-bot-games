@@ -16,7 +16,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.9", "3.10", "3.11"]
+        # 3.9 removido: o código usa sintaxe PEP 604 (`str | None`) avaliada em tempo de
+        # definição, sem `from __future__ import annotations` — em 3.9 é TypeError já no
+        # import (ex.: core/scanner.py, core/html_monitor.py). O job nunca pôde passar.
+        # 3.10 é a versão da imagem Docker (deploy/Dockerfile); 3.12 é a da venv local.
+        python-version: ["3.10", "3.11", "3.12"]
 
     steps:
     - uses: actions/checkout@v4
