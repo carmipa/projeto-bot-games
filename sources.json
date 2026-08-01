@@ -11,7 +11,8 @@
       "@TakeTwoGames, @KoeiTecmo, @Team17": "pagina do canal responde 404 - handle deixou de existir",
       "@EA": "handle ocupado por terceiro ('Albania', 0 videos) - trocado por @ElectronicArts",
       "@2K": "handle ocupado por terceiro ('cloner') - trocado por @2KGames",
-      "https://www.sega.com/ e https://www.devolverdigital.com/": "bloqueio de bot recorrente no HTML Monitor (falha em toda varredura)"
+      "https://www.sega.com/ e https://www.devolverdigital.com/": "bloqueio de bot recorrente no HTML Monitor (falha em toda varredura)",
+      "https://primagames.com/news/feed e https://www.siliconera.com/feed/": "BLOQUEIO DE IP, nao fonte morta: 200 de IP residencial, 403 do IP da VPS em 4 User-Agents x 7 caminhos. Vivas, mas inalcancaveis do servidor onde o bot roda. Reavaliar se o bot mudar de IP ou ganhar proxy."
     },
     "nao_adicionadas_por_volume": [
       "https://www.pcgamer.com/rss/",
@@ -35,7 +36,6 @@
     "https://www.gamesindustry.biz/rss/gamesindustry_news_feed.rss",
     "https://www.gameinformer.com/news.xml",
     "https://www.videogamer.com/feed/",
-    "https://primagames.com/news/feed",
     "https://pocketgamer.com/news/index.rss",
     "https://www.polygon.com/rss/index.xml",
     "https://www.theverge.com/rss/games/index.xml",
@@ -49,7 +49,6 @@
     "https://www.purexbox.com/feeds/latest",
 
     "https://www.gematsu.com/feed",
-    "https://www.siliconera.com/feed/",
     "https://automaton-media.com/en/feed/",
 
     "https://www.gamedeveloper.com/rss.xml",
