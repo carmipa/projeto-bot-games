@@ -154,9 +154,21 @@ def test_integration_web_api_stats_structure(monkeypatch):
 # ============== Integração: Scanner (run_scan_once com mock) ==============
 
 @_skip_no_discord
-def test_integration_run_scan_once_with_empty_config():
-    """run_scan_once com config vazio/sem channel_id retorna sem erro (não faz HTTP)."""
+def test_integration_run_scan_once_with_empty_config(sem_rede):
+    """
+    run_scan_once com config sem guild sai no primeiro portão, sem tocar a rede.
+
+    O `config.json` vem VAZIO do isolamento em conftest (DATA_DIR temporário). A fixture
+    `sem_rede` faz o teste falhar se alguém abrir uma ClientSession — antes esta função
+    dizia na docstring que 'não faz HTTP' enquanto executava uma varredura de produção
+    inteira contra 69 fontes reais.
+    """
     from core.scanner import run_scan_once
+    from utils.storage import load_json_safe, p
+
+    assert not load_json_safe(p("config.json"), {}), (
+        "isolamento falhou: config.json de testes deveria estar vazio"
+    )
 
     class MockBot:
         guilds = []
@@ -168,7 +180,27 @@ def test_integration_run_scan_once_with_empty_config():
         await run_scan_once(bot, trigger="test")
 
     asyncio.run(_run())
-    assert True
+
+
+@_skip_no_discord
+def test_integration_scan_nao_escreve_em_producao(sem_rede):
+    """
+    Trava de regressão: os arquivos de dados resolvidos durante os testes têm de viver no
+    DATA_DIR temporário, nunca na raiz do projeto. Se alguém remover o isolamento do
+    conftest, este teste denuncia — em vez de o estrago só aparecer no bot em produção.
+    """
+    from utils.storage import p
+
+    data_dir = os.environ.get("DATA_DIR", "")
+    assert data_dir, "DATA_DIR não definido: isolamento do conftest não está ativo"
+    for nome in ("config.json", "state.json", "history.json", "sources.json"):
+        resolvido = os.path.abspath(p(nome))
+        assert resolvido.startswith(os.path.abspath(data_dir)), (
+            f"{nome} resolveu para {resolvido}, fora do DATA_DIR de testes"
+        )
+        assert resolvido != os.path.join(ROOT, nome), (
+            f"{nome} resolveu para o arquivo de produção"
+        )
 
 
 @_skip_no_discord

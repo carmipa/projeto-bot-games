@@ -927,6 +927,31 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                                 log.warning(f"⚠️ Twitter/X Error: Header value too long (431) - {url}")
                                 return None
 
+                            # Qualquer outro não-200 é FALHA DE FONTE, não "feed vazio".
+                            # Antes o corpo do 403/404 era entregue ao feedparser, que devolvia
+                            # zero entradas — e o aviso abaixo só dispara em status 200. Resultado:
+                            # fontes mortas não contavam erro, não entravam em source_failures e
+                            # não apareciam em log nenhum (medido: 20 fontes mortas com
+                            # feeds_com_erro=0 no resumo da varredura).
+                            if resp.status != 200:
+                                rec = source_failures.setdefault(
+                                    url, {"count": 0, "last_error": "", "last_ts": 0}
+                                )
+                                rec["count"] = rec.get("count", 0) + 1
+                                rec["last_error"] = f"HTTP {resp.status}"
+                                rec["last_ts"] = time.time()
+                                feeds_errors += 1
+                                log.error(
+                                    f"❌ Feed respondeu HTTP {resp.status} (falha {rec['count']}x): {url}"
+                                )
+                                if rec["count"] >= 3:
+                                    log.error(
+                                        f"🔴 [Source Health] Fonte falhou {rec['count']} vezes com "
+                                        f"HTTP {resp.status}: {url} | Verifique se a fonte ainda existe "
+                                        f"ou remova-a do sources.json."
+                                    )
+                                return None
+
                             update_cache_state(url, resp.headers, http_cache)
                             text = await resp.text(errors="ignore")
 
@@ -938,12 +963,29 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                         if MAX_ENTRIES_PER_FEED > 0:
                             entries = entries[:MAX_ENTRIES_PER_FEED]
 
-                        if not entries and resp.status == 200:
+                        if not entries:
+                            # 200 sem entrada nenhuma também é sintoma de fonte doente
+                            # (handle de YouTube ocupado por terceiro, feed descontinuado,
+                            # bloqueio que devolve HTML em vez de XML). Passa a contar.
+                            rec = source_failures.setdefault(
+                                url, {"count": 0, "last_error": "", "last_ts": 0}
+                            )
+                            rec["count"] = rec.get("count", 0) + 1
+                            rec["last_error"] = "HTTP 200 sem entradas"
+                            rec["last_ts"] = time.time()
                             log.warning(
-                                "⚠️ Feed 200 sem entradas (possível bloqueio parcial, parser mismatch ou feed vazio): %s",
+                                "⚠️ Feed 200 sem entradas (falha %sx — bloqueio parcial, parser "
+                                "mismatch ou feed descontinuado): %s",
+                                rec["count"],
                                 url,
                             )
                             feeds_empty += 1
+                            if rec["count"] >= 3:
+                                log.error(
+                                    f"🔴 [Source Health] Fonte devolve 200 sem entradas há "
+                                    f"{rec['count']} varreduras: {url} | Provavelmente morta."
+                                )
+                            return (url, entries)
 
                         if url in source_failures:
                             source_failures[url]["count"] = 0

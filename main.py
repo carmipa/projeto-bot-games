@@ -3,6 +3,71 @@
 # main.py (Modularized)
 # =========================================================
 
+import importlib.util
+import sys
+
+
+def _preflight() -> None:
+    """
+    PROPÓSITO DE NEGÓCIO: falhar cedo e com instrução, em vez de despejar um
+    `ModuleNotFoundError` cru, quando o bot é iniciado com o interpretador errado. Na
+    máquina do Paulo o `python` do PATH é o 3.14 sem nenhuma dependência instalada; só a
+    `.venv` (3.12) tem o ambiente completo, e `python main.py` morria no `import discord`
+    sem dizer o porquê.
+
+    INVARIANTES DO DOMÍNIO: roda ANTES de qualquer import de terceiros, senão o erro que
+    tenta explicar acontece primeiro. Só usa a biblioteca padrão. Exige Python >= 3.10,
+    porque o código usa sintaxe PEP 604 (`str | None`) avaliada em tempo de definição.
+
+    COMPORTAMENTO EM CASO DE FALHA: imprime em stderr o interpretador em uso, o que falta
+    e o comando exato para corrigir, e encerra com `sys.exit(1)`. Nunca levanta exceção
+    nem tenta instalar nada por conta própria.
+    """
+    if sys.version_info < (3, 10):
+        print(
+            f"[GameBot] Python {sys.version_info.major}.{sys.version_info.minor} é antigo demais.\n"
+            f"          Este projeto exige Python 3.10+ (usa sintaxe 'str | None').\n"
+            f"          Interpretador em uso: {sys.executable}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    obrigatorios = {
+        "discord": "discord.py",
+        "aiohttp": "aiohttp",
+        "aiohttp_jinja2": "aiohttp-jinja2",
+        "jinja2": "jinja2",
+        "feedparser": "feedparser",
+        "bs4": "beautifulsoup4",
+        "deep_translator": "deep-translator",
+        "dotenv": "python-dotenv",
+        "dateutil": "python-dateutil",
+        "certifi": "certifi",
+        "colorama": "colorama",
+        # brotli não é importado pelo código, mas o aiohttp precisa dele para decodificar
+        # as respostas 'Accept-Encoding: br' que o bot pede. Sem ele, feeds inteiros
+        # falhavam com "Can not decode content-encoding: brotli (br)".
+        "brotli": "brotli",
+    }
+    faltando = [pkg for mod, pkg in obrigatorios.items() if importlib.util.find_spec(mod) is None]
+
+    if faltando:
+        print(
+            f"[GameBot] Dependências ausentes neste interpretador: {', '.join(faltando)}\n"
+            f"          Interpretador em uso: {sys.executable}\n\n"
+            f"          Use a venv do projeto:\n"
+            f"              Windows : .venv\\Scripts\\python.exe main.py   (ou .\\run.ps1)\n"
+            f"              Linux   : .venv/bin/python main.py\n\n"
+            f"          Para criar/atualizar a venv:\n"
+            f"              py -3.12 -m venv .venv\n"
+            f"              .venv\\Scripts\\python.exe -m pip install -r requirements.txt",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+
+_preflight()
+
 import logging
 import asyncio
 import discord
