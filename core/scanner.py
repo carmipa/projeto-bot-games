@@ -220,31 +220,70 @@ async def get_yt_rss(
     return await _fetch_youtube_channel_id_from_page(session, url, cache, timeout)
 
 
+# Âncoras para extrair o channel_id DA PRÓPRIA página do canal, em ordem de confiança.
+# A busca ingênua por "channelId" pega a PRIMEIRA ocorrência do HTML, que costuma ser um
+# canal recomendado/vinculado da barra lateral — o bot acabava assinando o canal errado
+# (medido: @PlayStation -> "Marathon", @Xbox -> "Forza", @SEGA -> "atlustube").
+# Estas três âncoras identificam a página, não os vizinhos dela.
+_YT_ID_PATTERNS = (
+    # 1. <link rel="alternate" type="application/rss+xml" href="...channel_id=UC...">
+    #    O próprio YouTube declara aqui o feed canônico da página. Fonte mais confiável.
+    re.compile(
+        r'<link[^>]+rel=["\']alternate["\'][^>]+href=["\'][^"\']*channel_id=(UC[A-Za-z0-9_-]{22})',
+        re.IGNORECASE,
+    ),
+    # 2. "externalId" no ytInitialData é o ID do canal exibido, não dos recomendados.
+    re.compile(r'"externalId"\s*:\s*"(UC[A-Za-z0-9_-]{22})"'),
+    # 3. <link rel="canonical" href=".../channel/UC...">
+    re.compile(
+        r'<link[^>]+rel=["\']canonical["\'][^>]+href=["\'][^"\']*/channel/(UC[A-Za-z0-9_-]{22})',
+        re.IGNORECASE,
+    ),
+)
+
+
 async def _fetch_youtube_channel_id_from_page(
     session: aiohttp.ClientSession,
     url: str,
     cache: Dict[str, str],
     timeout: aiohttp.ClientTimeout,
 ) -> str:
-    """Faz GET na página do canal e extrai channelId do código fonte (fallback quando não está no mapa)."""
+    """
+    PROPÓSITO DE NEGÓCIO: converter a URL amigável de um canal do YouTube (@handle) no
+    endereço do feed Atom correspondente, para que o bot consiga acompanhar os trailers e
+    anúncios daquele estúdio. É o caminho de recurso — o normal é o `youtube_feed_map` do
+    sources.json já trazer o par pronto, sem gastar requisição.
+
+    INVARIANTES DO DOMÍNIO: o channel_id devolvido tem de ser o do canal DA PÁGINA pedida.
+    Só valem âncoras que identificam a própria página (link alternate do feed, externalId,
+    link canonical); qualquer ocorrência solta de "channelId" no HTML pode ser um canal
+    recomendado e é proibida como fonte. O resultado só vai para o cache quando extraído.
+
+    COMPORTAMENTO EM CASO DE FALHA: devolve a URL original inalterada (nunca levanta) em
+    qualquer um destes casos — página com status != 200, erro de rede/timeout, ou nenhuma
+    âncora encontrada. A URL original vira um feed sem entradas mais à frente, que a
+    varredura contabiliza e reporta como fonte problemática.
+    """
     try:
         headers = get_robust_headers() # Simula navegador real
         async with session.get(url, headers=headers, timeout=timeout) as resp:
             if resp.status != 200:
-                log.debug(f"YouTube resolve: {url} retornou {resp.status}. Mantendo URL original.")
+                log.warning(
+                    f"YouTube resolve: página do canal {url} retornou {resp.status} "
+                    f"(handle provavelmente já não existe). Mantendo URL original."
+                )
                 return url
             html = await resp.text(errors="ignore")
     except (aiohttp.ClientError, asyncio.TimeoutError) as e:
         log.warning(f"YouTube resolve: falha ao acessar {url}: {e}. Mantendo URL original.")
         return url
 
-    # YouTube embute channelId no HTML (ytInitialData ou meta)
-    m = re.search(r'"channelId"\s*:\s*"(UC[A-Za-z0-9_-]{22})"', html)
-    if not m:
-        m = re.search(r'channel_id=([A-Za-z0-9_-]{24})', html)
-    if not m:
-        m = re.search(r'/channel/(UC[A-Za-z0-9_-]{22})', html)
-    channel_id = m.group(1) if m else None
+    channel_id = None
+    for pattern in _YT_ID_PATTERNS:
+        m = pattern.search(html)
+        if m:
+            channel_id = m.group(1)
+            break
 
     if channel_id:
         feed_url = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
@@ -252,7 +291,10 @@ async def _fetch_youtube_channel_id_from_page(
         log.info(f"YouTube: @ resolvido para feed RSS: {url} -> {feed_url}")
         return feed_url
 
-    log.debug(f"YouTube: não foi possível extrair channel_id de {url}. Mantendo URL original.")
+    log.warning(
+        f"YouTube: nenhuma âncora de channel_id encontrada em {url}. Mantendo URL original "
+        f"(o feed virá vazio). Considere fixar o par no youtube_feed_map do sources.json."
+    )
     return url
 
 
