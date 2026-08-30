@@ -9,23 +9,38 @@ init(autoreset=True, strip=False)
 
 class SecurityFilter(logging.Filter):
     """
-    Filtro de segurança que sanitiza mensagens de log para remover informações sensíveis.
+    PROPÓSITO DE NEGÓCIO: garantir que o token do Discord, o token do dashboard web ou uma
+    URL de webhook nunca cheguem a `logs/bot.log` nem ao console, independentemente de
+    quem chamou o logger e de como escreveu a chamada.
+
+    INVARIANTES DO DOMÍNIO: sanitiza a mensagem RENDERIZADA, com os argumentos já
+    interpolados. A versão anterior sanitizava só `record.msg` quando ele era `str` — o
+    que, numa chamada de formatação preguiçosa (`log.error("feed %s falhou", url)`),
+    limpava apenas o molde `"feed %s falhou"` e deixava o argumento intacto. Como o
+    projeto usa esse estilo em vários pontos do scanner, a garantia anunciada no README
+    ("tokens e dados sensíveis mascarados") era mais larga do que a realidade. Depois de
+    renderizar, `record.args` é zerado — senão o handler tentaria interpolar de novo uma
+    mensagem que já não tem marcadores e levantaria erro de formatação.
+
+    COMPORTAMENTO EM CASO DE FALHA: o filtro NUNCA descarta um registo. Falha ao importar
+    o sanitizador, ou erro ao renderizar a mensagem (argumentos incompatíveis com o
+    molde), devolve `True` deixando o registo seguir como estava — perder o log de um erro
+    seria pior do que arriscar não o ter mascarado.
     """
     def filter(self, record):
-        # Importação local para evitar circular
         try:
             from utils.security import sanitize_log_message
-            
-            # Sanitiza a mensagem antes de ser logada
-            if hasattr(record, 'msg') and isinstance(record.msg, str):
-                record.msg = sanitize_log_message(record.msg)
-            elif hasattr(record, 'getMessage'):
-                # Para mensagens formatadas
-                original_msg = record.getMessage()
-                record.msg = sanitize_log_message(original_msg)
         except ImportError:
-            # Se não conseguir importar, apenas passa adiante sem sanitizar
-            pass
+            return True
+
+        try:
+            renderizada = record.getMessage()
+        except Exception:
+            # Molde e argumentos incompatíveis: deixa o logging lidar com isso.
+            return True
+
+        record.msg = sanitize_log_message(renderizada)
+        record.args = ()
         return True
 
 

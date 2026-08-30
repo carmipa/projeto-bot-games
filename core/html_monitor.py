@@ -12,7 +12,7 @@ from bs4 import BeautifulSoup
 from settings import MAX_CONCURRENT_FEEDS
 
 from utils.storage import p, load_json_safe, save_json_safe
-from utils.security import validate_url, sanitize_log_message
+from utils.security import validate_url_async, sanitize_log_message
 from utils.http import get_robust_headers
 
 log = logging.getLogger("GameBot")
@@ -70,7 +70,7 @@ async def fetch_page_hash(
     pelo semáforo (evita baixar dezenas de páginas HTML inteiras ao mesmo tempo).
     """
     # Validação de segurança (anti-SSRF) uma única vez, antes das tentativas
-    is_valid, error_msg = validate_url(url)
+    is_valid, error_msg = await validate_url_async(url)
     if not is_valid:
         log.warning(sanitize_log_message(f"🔒 URL bloqueada por segurança no HTML Monitor: {url} - {error_msg}"))
         return url, "", ""

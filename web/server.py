@@ -15,7 +15,11 @@ from core.stats import stats
 from utils.storage import p
 from settings import LOG_LEVEL
 
-log = logging.getLogger("GameNewsWeb")
+# Logger FILHO de "GameBot", não um logger irmão. Como "GameNewsWeb", este módulo não
+# herdava nem os handlers nem o SecurityFilter configurados em `setup_logger`: os avisos
+# de INFO desapareciam, e "tentativa de acesso com token inválido de IP X" — um evento de
+# segurança — só saía no stderr do último recurso, nunca em `logs/bot.log`.
+log = logging.getLogger("GameBot.web")
 
 # Configuração de segurança
 WEB_AUTH_TOKEN = os.getenv("WEB_AUTH_TOKEN", None)
@@ -180,5 +184,40 @@ async def start_web_server(host=None, port=None):
     if server_host == "0.0.0.0":
         log.warning("⚠️ Servidor web escutando em 0.0.0.0 (acessível de qualquer IP)!")
         log.warning("⚠️ Considere usar 127.0.0.1 ou configurar firewall adequadamente!")
-    
+
     await site.start()
+
+
+async def start_web_server_tolerante(host=None, port=None) -> bool:
+    """
+    PROPÓSITO DE NEGÓCIO: subir o dashboard web sem que a falha dele possa derrubar a
+    função principal do bot, que é varrer fontes e publicar notícias. O dashboard é
+    acessório; a varredura não é.
+
+    INVARIANTES DO DOMÍNIO: esta função NUNCA propaga exceção. Ela é chamada de dentro do
+    `on_ready`, e `on_ready` é um handler de evento: uma exceção ali é apenas registada
+    pelo discord.py e TUDO o que vem depois deixa de correr. Bastava a porta 8080 estar
+    ocupada — outra instância do bot, um serviço qualquer — para o bot ficar online,
+    responder aos comandos já sincronizados e nunca mais sincronizar comandos, iniciar o
+    agendador ou varrer, sem nenhum log que ligasse a causa ao efeito.
+
+    COMPORTAMENTO EM CASO DE FALHA: devolve `False` e regista o motivo. `OSError` (porta
+    ocupada, host inválido, permissão) sai como ERROR com a instrução de conferir
+    WEB_HOST/WEB_PORT; qualquer outra exceção sai como `log.exception` com traceback.
+    Devolve `True` só quando o servidor ficou de facto a escutar.
+    """
+    try:
+        await start_web_server(host=host, port=port)
+        return True
+    except OSError as e:
+        log.error(
+            f"🌐 Dashboard web não subiu ({type(e).__name__}: {e}). "
+            f"Porta ocupada ou host inválido — confira WEB_HOST/WEB_PORT. "
+            f"O bot CONTINUA: varredura, comandos e agendador não dependem dele."
+        )
+    except Exception as e:
+        log.exception(
+            f"🌐 Falha inesperada ao iniciar o dashboard web: {type(e).__name__}: {e}. "
+            f"O bot continua sem ele."
+        )
+    return False

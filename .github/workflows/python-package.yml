@@ -31,14 +31,37 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install flake8 pytest
+        python -m pip install flake8 pytest pip-audit
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
     - name: Lint with flake8
       run: |
-        # stop the build if there are Python syntax errors or undefined names
+        # Reprova por erro de sintaxe ou nome indefinido.
+        # ATENCAO: --select casa por PREFIXO. "F82" tambem captura F824 (`nonlocal` de nome
+        # nunca reatribuido), que reprovou este passo em silencio quando o pyflakes 3.x
+        # introduziu a regra. Como este passo vem ANTES do pytest e os passos sao
+        # sequenciais, a suite deixou de rodar no CI sem ninguem notar. Corrigido no codigo
+        # (core/scanner.py), nao afrouxando o filtro.
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with pytest
       run: |
         pytest
+    # Fecha a lacuna "verificacao de dependencias vulneraveis", ate aqui um GAP declarado.
+    #
+    # REPROVA a build em qualquer vulnerabilidade nova. A unica excecao e nominal e
+    # justificada abaixo — excecao com nome e data e auditavel; `continue-on-error` num
+    # passo inteiro so ensina a ignorar o passo.
+    #
+    # PYSEC-2022-252 (deep-translator): registra o sequestro da conta do mantenedor no PyPI
+    # em 2022, quando saiu uma release maliciosa que roubava variaveis de ambiente e baixava
+    # malware EM TEMPO DE INSTALACAO. O aviso nao declara versao corrigida, entao casa com
+    # qualquer versao — inclusive a 1.11.4, que e a mais recente publicada e ja e o piso do
+    # requirements.txt. Verificado em 2026-08-29 no artefato instalado: e wheel pura
+    # (poetry-core 1.6.1, Root-Is-Purelib), sem setup.py, sem arquivo .pth e sem
+    # subprocess/os.system/eval/exec/os.environ no codigo do pacote — o vetor descrito no
+    # aviso nao existe neste artefato. Reavaliar se o projeto publicar versao nova.
+    - name: Audit dependencies (pip-audit)
+      run: |
+        pip-audit --requirement requirements.txt --strict --progress-spinner=off \
+          --ignore-vuln PYSEC-2022-252

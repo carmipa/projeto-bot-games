@@ -44,7 +44,7 @@ from utils.storage import p, load_json_safe, save_json_safe
 from utils.html import clean_html
 from utils.cache import get_cache_headers, update_cache_state
 from utils.translator import translate_to_target, t
-from utils.security import validate_url, sanitize_log_message
+from utils.security import validate_url_async, sanitize_log_message
 from utils.http import get_robust_headers
 from core.stats import stats
 from core.filters import should_post_to_guild, should_skip_by_content
@@ -504,7 +504,7 @@ async def extract_og_image_safe(session: aiohttp.ClientSession, article_url: str
     if not article_url or not article_url.startswith(("http://", "https://")):
         return None
 
-    ok, err = validate_url(article_url, allowed_domains=OG_IMAGE_ALLOWED_DOMAINS or None)
+    ok, err = await validate_url_async(article_url, allowed_domains=OG_IMAGE_ALLOWED_DOMAINS or None)
     if not ok:
         log.debug("og:image fallback bloqueado para %s (%s)", article_url, err)
         return None
@@ -539,7 +539,7 @@ async def extract_og_image_safe(session: aiohttp.ClientSession, article_url: str
         return None
 
     image_url = urljoin(article_url, image_url)
-    ok_img, err_img = validate_url(image_url)
+    ok_img, err_img = await validate_url_async(image_url)
     if not ok_img:
         log.debug("og:image inválido/unsafe (%s): %s", image_url, err_img)
         return None
@@ -890,11 +890,15 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
         source_failures = state["source_failures"]
 
         async def fetch_and_process_feed(session, url):
-            nonlocal cache_hits, state, feeds_empty, feeds_errors, feeds_blocked_security, entries_undated_skipped
+            # `state` e `entries_undated_skipped` NAO entram aqui: não são atribuídos neste
+            # escopo, e `nonlocal` de nome nunca reatribuído é F824 — que o `--select=F82`
+            # do CI captura por prefixo. O passo de lint reprovava e, sendo anterior ao
+            # `pytest` no workflow, deixava a suíte sem rodar no CI.
+            nonlocal cache_hits, feeds_empty, feeds_errors, feeds_blocked_security
 
             async with semaphore:
                 # Validação de segurança: anti-SSRF
-                is_valid, error_msg = validate_url(url)
+                is_valid, error_msg = await validate_url_async(url)
                 if not is_valid:
                     log.warning(sanitize_log_message(f"🔒 URL bloqueada por segurança: {url} - {error_msg}"))
                     feeds_blocked_security += 1
@@ -952,7 +956,20 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                                     )
                                 return None
 
-                            update_cache_state(url, resp.headers, http_cache)
+                            # NAO grava o ETag aqui. Gravar antes de postar transforma
+                            # qualquer falha de entrega (canal sem permissao, canal
+                            # apagado, 5xx do Discord) em perda PERMANENTE: a varredura
+                            # seguinte recebe 304 e as entradas nunca mais aparecem.
+                            # Os cabecalhos viajam com o resultado e so viram cache
+                            # depois que o processamento do feed terminou inteiro.
+                            # Nomes canônicos: `resp.headers` é CIMultiDict (busca sem
+                            # distinguir maiúsculas); um dict comum não é, e um servidor
+                            # que respondesse `Etag:` perderia o cache em silêncio.
+                            cabecalhos_cache = {}
+                            for _nome in ("ETag", "Last-Modified"):
+                                _valor = resp.headers.get(_nome)
+                                if _valor:
+                                    cabecalhos_cache[_nome] = _valor
                             text = await resp.text(errors="ignore")
 
                         loop = asyncio.get_running_loop()
@@ -960,7 +977,19 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
 
                         entries = getattr(feed, "entries", []) or []
                         # MAX_ENTRIES_PER_FEED <= 0 => sem limitação (processa tudo)
-                        if MAX_ENTRIES_PER_FEED > 0:
+                        if MAX_ENTRIES_PER_FEED > 0 and len(entries) > MAX_ENTRIES_PER_FEED:
+                            # Truncagem SILENCIOSA era perda invisivel: com varredura de
+                            # 24h e teto de 10, um feed que publica 14 itens/dia perdia 4
+                            # todo dia sem uma linha de log. O feed nao tem paginacao, entao
+                            # o que se pode fazer e tornar a perda VISIVEL — e o operador
+                            # decide entre subir MAX_ENTRIES_PER_FEED ou baixar LOOP_MINUTES.
+                            log.warning(
+                                "✂️ Feed truncado: %s trouxe %s entradas, MAX_ENTRIES_PER_FEED=%s "
+                                "— %s descartadas SEM analise. Se repetir, aumente "
+                                "MAX_ENTRIES_PER_FEED ou reduza LOOP_MINUTES (hoje %s min).",
+                                url, len(entries), MAX_ENTRIES_PER_FEED,
+                                len(entries) - MAX_ENTRIES_PER_FEED, LOOP_MINUTES,
+                            )
                             entries = entries[:MAX_ENTRIES_PER_FEED]
 
                         if not entries:
@@ -985,11 +1014,11 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                                     f"🔴 [Source Health] Fonte devolve 200 sem entradas há "
                                     f"{rec['count']} varreduras: {url} | Provavelmente morta."
                                 )
-                            return (url, entries)
+                            return (url, entries, cabecalhos_cache)
 
                         if url in source_failures:
                             source_failures[url]["count"] = 0
-                        return (url, entries)
+                        return (url, entries, cabecalhos_cache)
 
                     except (aiohttp.ClientError, asyncio.TimeoutError, OSError) as e:
                         last_error = e
@@ -1056,21 +1085,29 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
             for result in results:
                 if result is None:
                     continue
-                    
-                url, entries = result
-                
+
+                url, entries, cabecalhos_cache = result
+
+                # Vira True assim que uma entrega FALHA (canal ausente, sem permissão, erro
+                # do Discord) ou o processamento do feed é cortado pelo teto de tempo.
+                # Enquanto for True, o ETag deste feed NÃO avança: na próxima varredura o
+                # feed é rebaixado inteiro e as entradas voltam a ser vistas. Item
+                # descartado por filtro não conta como falha — foi decisão, não perda.
+                falha_de_entrega = False
+
                 # Cold Start Check para este feed específico
                 # Se a URL não estiver no dedup, é um cold start ou reset deste feed
                 is_cold_start = url not in state["dedup"]
                 if is_cold_start:
                     log.info(f"❄️ [Cold Start] Detectado para {url}. Ignorando travas de tempo para os 3 primeiros posts.")
                     state["dedup"][url] = []
-                
+
                 feed_posted_count = 0
-                
+
                 for entry in entries:
                     if (time.time() - scan_start_time) > MAX_SCAN_DURATION:
                          log.warning(f"🛑 [Timeout Scan-Post] Interrompendo processamento de {url} (scan > 125m).")
+                         falha_de_entrega = True
                          break
 
                     link = entry.get("link") or "" 
@@ -1166,6 +1203,7 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                         channel = bot.get_channel(channel_id)
                         if channel is None:
                             log.warning(f"Canal {channel_id} não encontrado.")
+                            falha_de_entrega = True
                             continue
 
                         # Tradução
@@ -1221,20 +1259,36 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
 
                         except discord.Forbidden as e:
                             log.error(f"🚫 Sem permissão para enviar mensagem no canal {channel_id} (guild {gid}): {e}")
+                            falha_de_entrega = True
                         except discord.HTTPException as e:
                             log.error(f"🌐 Erro HTTP ao enviar mensagem no canal {channel_id}: {e.status} - {e.text}")
+                            falha_de_entrega = True
                         except (ValueError, TypeError) as e:
                             # discord.py 2.x removeu discord.InvalidArgument; embed/botão inválido
                             # lança ValueError/TypeError. Sem este catch, o erro abortava a varredura.
                             log.error(f"⚠️ Argumento inválido ao criar embed/mensagem: {type(e).__name__}: {e}")
+                            falha_de_entrega = True
                         except Exception as e:
                             log.exception(f"❌ Falha inesperada ao enviar no canal {channel_id} (guild {gid}): {type(e).__name__}: {e}")
+                            falha_de_entrega = True
 
                     if posted_anywhere:
                         # Adiciona ao dedup específico e global
                         state["dedup"][url].append(link)
                         history_set.add(link)
                         history_list.append(link)
+
+                # O ETag/Last-Modified só entra no cache depois que o feed inteiro foi
+                # processado SEM falha de entrega. É o que garante que "não consegui postar"
+                # vire "tento de novo na próxima", e não "perdi para sempre".
+                if falha_de_entrega:
+                    log.warning(
+                        "🔁 Cache HTTP de %s NÃO avançado: houve falha de entrega nesta varredura. "
+                        "O feed será rebaixado inteiro na próxima para não perder as entradas.",
+                        url,
+                    )
+                elif cabecalhos_cache:
+                    update_cache_state(url, cabecalhos_cache, http_cache)
 
         # =========================================================
         # HTML MONITOR RUN (SITE WATCHER)

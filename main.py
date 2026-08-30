@@ -77,7 +77,7 @@ from settings import TOKEN, COMMAND_PREFIX, LOG_LEVEL
 from utils.storage import p, load_json_safe
 from bot.views.filter_dashboard import FilterDashboard
 from core.scanner import start_scheduler, run_scan_once
-from web.server import start_web_server  # Novo web server
+from web.server import start_web_server_tolerante  # Novo web server
 from utils.git_info import get_git_changes, get_current_hash
 from utils.storage import save_json_safe
 
@@ -93,6 +93,17 @@ log = setup_logger(name="GameBot", log_file="logs/bot.log", level=LOG_LEVEL)
 # =========================================================
 
 async def main():
+    # Portão de arranque: sem token não há nada a fazer, e falhar aqui com instrução é
+    # melhor do que deixar `bot.start(None)` levantar um erro da biblioteca lá no fim,
+    # depois de já ter carregado cogs e aberto o servidor web.
+    if not TOKEN or not TOKEN.strip():
+        log.error(
+            "🔑 DISCORD_TOKEN ausente ou vazio. Crie o arquivo .env na raiz do projeto "
+            "(copie de .env.example) e preencha DISCORD_TOKEN com o token do bot obtido "
+            "no Discord Developer Portal. O bot não vai subir sem ele."
+        )
+        raise SystemExit(1)
+
     # Intents
     intents = discord.Intents.default()
     intents.guilds = True
@@ -137,8 +148,12 @@ async def main():
         log.info(f"📊 Servidores conectados: {len(bot.guilds)}")
 
         # 0. Iniciar Web Server (Fase 10)
-        # Host e porta agora vêm de variáveis de ambiente (padrão: 127.0.0.1:8080)
-        await start_web_server()
+        # Host e porta vêm de variáveis de ambiente (padrão: 127.0.0.1:8080).
+        # Versão TOLERANTE de propósito: `on_ready` é handler de evento, e uma exceção aqui
+        # é engolida pelo discord.py — tudo o que vem depois (sync de comandos, agendador,
+        # anúncio de versão) deixaria de correr. Ver docstring de start_web_server_tolerante
+        # e a guarda em tests/test_web_server_tolerante.py.
+        await start_web_server_tolerante()
 
         # 1. Carregar Views Persistentes
         cfg = load_json_safe(p("config.json"), {})

@@ -1,8 +1,10 @@
 """
 Security utilities - URL validation, SSRF protection, input sanitization.
 """
+import asyncio
 import re
 import ipaddress
+import socket
 from urllib.parse import urlparse
 from typing import Optional, List, Tuple
 import logging
@@ -32,9 +34,6 @@ BLOCKED_DOMAINS = [
 ALLOWED_SCHEMES = ["http", "https"]
 
 
-import socket
-
-
 def is_private_ip(ip: str) -> bool:
     """
     Verifica se um IP é privado/local.
@@ -55,84 +54,134 @@ def is_private_ip(ip: str) -> bool:
         return False
 
 
-def validate_url(url: str, allowed_domains: Optional[List[str]] = None) -> Tuple[bool, Optional[str]]:
+def _validar_estrutura(url: str, allowed_domains: Optional[List[str]]) -> Tuple[bool, Optional[str], Optional[str]]:
     """
-    Valida uma URL contra ataques SSRF e outros problemas de segurança.
-    Inclui resolução DNS para detectar domínios que apontam para IPs internos.
-    
-    Args:
-        url: URL a validar
-        allowed_domains: Lista opcional de domínios permitidos (whitelist)
-    
+    Parte SÍNCRONA e barata da validação: esquema, netloc, domínio bloqueado, whitelist e
+    caracteres de controle. Não toca na rede.
+
     Returns:
-        (is_valid, error_message)
-        is_valid: True se a URL é segura
-        error_message: Mensagem de erro se inválida, None se válida
+        (ok, erro, host) — `host` só vem preenchido quando ok=True e ainda falta a
+        checagem de DNS. Separar as duas metades existe para que o caminho assíncrono
+        possa resolver o DNS sem bloquear o event loop.
     """
     if not url or not isinstance(url, str):
-        return False, "URL inválida: deve ser uma string não vazia"
-    
+        return False, "URL inválida: deve ser uma string não vazia", None
+
     url = url.strip()
-    
-    # Verifica esquema permitido
+
     if not url.startswith(("http://", "https://")):
-        return False, f"URL deve começar com http:// ou https://"
-    
+        return False, "URL deve começar com http:// ou https://", None
+
     try:
         parsed = urlparse(url)
     except Exception as e:
-        return False, f"Erro ao fazer parse da URL: {e}"
-    
-    # Valida esquema
-    if parsed.scheme not in ALLOWED_SCHEMES:
-        return False, f"Esquema '{parsed.scheme}' não permitido. Use http:// ou https://"
-    
-    # Valida netloc (domínio/IP)
-    if not parsed.netloc:
-        return False, "URL deve conter um domínio ou IP válido"
-    
-    # Remove porta para validação
-    netloc_without_port = parsed.netloc.split(":")[0]
-    
-    # Verifica domínios bloqueados (estático)
-    if netloc_without_port.lower() in BLOCKED_DOMAINS:
-        return False, f"Domínio '{netloc_without_port}' não permitido (domínio local)"
-    
-    # Validação de IP Resolved (Anti-SSRF via DNS Rebinding/Localhost aliases)
-    try:
-        # Resolve o endereço para verificar o IP real por trás do domínio
-        addr_info = socket.getaddrinfo(netloc_without_port, None)
-        for item in addr_info:
-            resolved_ip = item[4][0]
-            if is_private_ip(resolved_ip):
-                return False, f"O endereço '{netloc_without_port}' resolve para um IP privado ({resolved_ip}) e não é permitido."
-    except socket.gaierror:
-        # Se não resolver, pode ser um domínio inválido ou problemas de rede.
-        # Permitimos passar aqui pois a biblioteca HTTP (aiohttp) falhará na conexão.
-        pass
-    except Exception as e:
-        log.debug(f"Erro na resolução DNS para validação SSRF: {e}")
-        # Em caso de erro bizarro na resolução, bloqueamos por segurança
-        return False, "Erro ao validar o endereço (resolução DNS falhou)"
+        return False, f"Erro ao fazer parse da URL: {e}", None
 
-    # Se há whitelist de domínios, valida contra ela
+    if parsed.scheme not in ALLOWED_SCHEMES:
+        return False, f"Esquema '{parsed.scheme}' não permitido. Use http:// ou https://", None
+
+    if not parsed.netloc:
+        return False, "URL deve conter um domínio ou IP válido", None
+
+    netloc_without_port = parsed.netloc.split(":")[0]
+
+    if netloc_without_port.lower() in BLOCKED_DOMAINS:
+        return False, f"Domínio '{netloc_without_port}' não permitido (domínio local)", None
+
     if allowed_domains:
         domain_match = False
         for allowed in allowed_domains:
             if netloc_without_port.lower() == allowed.lower() or netloc_without_port.lower().endswith("." + allowed.lower()):
                 domain_match = True
                 break
-        
+
         if not domain_match:
-            return False, f"Domínio '{netloc_without_port}' não está na whitelist permitida"
-    
-    # Validação adicional: verifica caracteres suspeitos
+            return False, f"Domínio '{netloc_without_port}' não está na whitelist permitida", None
+
     suspicious_chars = ["\x00", "\r", "\n", "\t"]
     for char in suspicious_chars:
         if char in url:
-            return False, f"URL contém caracteres suspeitos"
-    
+            return False, "URL contém caracteres suspeitos", None
+
+    return True, None, netloc_without_port
+
+
+def _veredito_dns(host: str, enderecos: Optional[List[str]], erro_resolucao: Optional[BaseException]) -> Tuple[bool, Optional[str]]:
+    """Aplica a política anti-SSRF sobre o resultado da resolução, venha ela de onde vier."""
+    if erro_resolucao is not None:
+        if isinstance(erro_resolucao, socket.gaierror):
+            # Domínio inexistente ou rede fora: a própria conexão vai falhar depois.
+            # Não é caso de bloquear como se fosse ataque.
+            return True, None
+        log.debug(f"Erro na resolução DNS para validação SSRF: {erro_resolucao}")
+        # Erro inesperado na resolução: falha FECHADA.
+        return False, "Erro ao validar o endereço (resolução DNS falhou)"
+
+    for resolved_ip in enderecos or []:
+        if is_private_ip(resolved_ip):
+            return False, f"O endereço '{host}' resolve para um IP privado ({resolved_ip}) e não é permitido."
     return True, None
+
+
+def validate_url(url: str, allowed_domains: Optional[List[str]] = None) -> Tuple[bool, Optional[str]]:
+    """
+    PROPÓSITO DE NEGÓCIO: impedir que uma URL de `sources.json` (ou o `og:image` de um
+    artigo de terceiro) faça o bot buscar um recurso da rede interna de quem o hospeda —
+    o clássico SSRF. Toda URL que o bot vai baixar passa por aqui antes.
+
+    INVARIANTES DO DOMÍNIO: esquema restrito a http/https; nome local explícito é
+    recusado; o IP por trás do nome é conferido contra as faixas privadas, porque um
+    domínio público pode apontar para 127.0.0.1. Erro inesperado na resolução falha
+    FECHADO; nome inexistente passa (a conexão falha depois, e tratar NXDOMAIN como
+    ataque só produziria ruído).
+
+    COMPORTAMENTO EM CASO DE FALHA: devolve `(False, motivo)` — nunca levanta. Esta versão
+    é SÍNCRONA e faz `socket.getaddrinfo`, que bloqueia. Dentro de corrotina, use
+    `validate_url_async`: com dezenas de fontes por varredura, a soma dos DNS lentos
+    trava o event loop e derruba o heartbeat do gateway do Discord.
+    """
+    ok, erro, host = _validar_estrutura(url, allowed_domains)
+    if not ok or host is None:
+        return ok, erro
+
+    enderecos: Optional[List[str]] = None
+    falha: Optional[BaseException] = None
+    try:
+        enderecos = [item[4][0] for item in socket.getaddrinfo(host, None)]
+    except Exception as e:
+        falha = e
+
+    return _veredito_dns(host, enderecos, falha)
+
+
+async def validate_url_async(url: str, allowed_domains: Optional[List[str]] = None) -> Tuple[bool, Optional[str]]:
+    """
+    PROPÓSITO DE NEGÓCIO: a mesma validação anti-SSRF de `validate_url`, para uso dentro
+    do event loop. A varredura valida ~70 feeds e o HTML Monitor ~29 sites por ciclo.
+
+    INVARIANTES DO DOMÍNIO: mesma política, mesmos vereditos — a única diferença é que a
+    resolução usa `loop.getaddrinfo`, que não segura a thread do asyncio. Qualquer regra
+    nova tem de entrar em `_validar_estrutura`/`_veredito_dns`, que as duas versões
+    partilham; duas cópias da política divergiriam em silêncio.
+
+    COMPORTAMENTO EM CASO DE FALHA: idêntico ao síncrono — devolve `(False, motivo)` e
+    nunca levanta. Sem event loop em execução, `asyncio.get_running_loop()` levantaria
+    `RuntimeError`, mas a função é uma corrotina: só há como aguardá-la dentro de um loop.
+    """
+    ok, erro, host = _validar_estrutura(url, allowed_domains)
+    if not ok or host is None:
+        return ok, erro
+
+    loop = asyncio.get_running_loop()
+    enderecos: Optional[List[str]] = None
+    falha: Optional[BaseException] = None
+    try:
+        info = await loop.getaddrinfo(host, None)
+        enderecos = [item[4][0] for item in info]
+    except Exception as e:
+        falha = e
+
+    return _veredito_dns(host, enderecos, falha)
 
 
 # Padrões ANCORADOS de segredo. Cada um exige um rótulo, um cabeçalho ou uma forma
