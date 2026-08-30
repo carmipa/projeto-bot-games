@@ -26,7 +26,9 @@ PRIVATE_IP_RANGES = [
 BLOCKED_DOMAINS = [
     "localhost",
     "127.0.0.1",
-    "0.0.0.0",
+    # Falso positivo do bandit (B104): esta e a lista de dominios BLOQUEADOS. A string
+    # aqui PROIBE o endereco, nao vincula o servidor a ele.
+    "0.0.0.0",  # nosec B104
     "::1",
 ]
 

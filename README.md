@@ -52,6 +52,7 @@ Bot de Discord para **notícias e trailers de jogos**. Monitora lançamentos, DL
 | Sanitização de logs | Tokens, `Authorization:` e URLs de webhook mascarados na mensagem **já formatada** (cobre `log.error("... %s", segredo)`) |
 | SSL | Conexões verificadas com certifi |
 | Auditoria de dependências | `pip-audit` no CI, que reprova em CVE nova (exceções são nominais e justificadas no workflow) |
+| Análise estática | `bandit` no CI, que reprova em padrão de risco (`shell=True`, `eval`, bind aberto, `except` mudo). Exceções são `# nosec BXXX` no ponto exato, com o motivo na linha acima |
 
 > Limite conhecido: a validação anti-SSRF resolve o nome e depois deixa o `aiohttp` resolver
 > de novo — há uma janela de DNS rebinding. Aceitável porque `sources.json` é controlado por
@@ -271,6 +272,7 @@ projeto-bot-games/
 ```bash
 .venv\Scripts\python.exe -m pytest -q
 .venv\Scripts\python.exe -m flake8 . --count --select=E9,F63,F7,F82 --statistics
+.venv\Scripts\python.exe -m bandit -r bot core utils web scripts main.py settings.py -q
 .venv\Scripts\python.exe -m pip_audit --requirement requirements.txt --strict --ignore-vuln PYSEC-2022-252
 .venv\Scripts\python.exe scripts\probe_sources.py --catalogo
 ```

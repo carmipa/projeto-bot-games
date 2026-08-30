@@ -31,7 +31,15 @@ Relatório com evidência colada: `analises/2026-08-29_auditoria-seguranca-engen
 - **Logger do dashboard não chegava ao arquivo.** Era `getLogger("GameNewsWeb")`, irmão e não
   filho de `GameBot`: sem handlers e sem `SecurityFilter`. "Token inválido do IP X" — evento
   de segurança — nunca entrava em `logs/bot.log`. Agora é `GameBot.web`.
-- **CI ganhou varredura de dependências vulneráveis** (`pip-audit`), que era GAP declarado.
+- **CI ganhou análise estática dedicada** (`bandit`) e **varredura de dependências
+  vulneráveis** (`pip-audit`) — os dois eram GAP declarado. Ambos **reprovam** a build.
+  O `bandit` achou 11 na primeira execução; os 3 reais (`except Exception: pass` mudo em
+  `extract_entry_media_urls`, que fazia a entrada perder a imagem sem deixar rasto) foram
+  **corrigidos**, não suprimidos. Os 2 de severidade média eram falso positivo: ele marca a
+  *string* `"0.0.0.0"`, e os dois usos são o oposto de abrir o bind — um está na lista de
+  domínios **bloqueados** e o outro numa comparação que **avisa**. As 6 exceções são
+  `# nosec BXXX` no ponto exato, com o motivo escrito na linha acima.
+- Sobre o `pip-audit`:
   Reprova em qualquer CVE nova; a única exceção é nominal, datada e justificada
   (PYSEC-2022-252 do `deep-translator`, sem versão de correção — artefato instalado
   verificado: wheel pura, sem `setup.py`/`.pth`/`subprocess`/`eval`/`environ`).

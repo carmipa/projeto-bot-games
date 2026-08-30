@@ -309,6 +309,30 @@ deste desktop (IP residencial), confirmando o registro de agosto de que a remoç
 **bloqueio do IP do servidor**, não por fonte morta. Continuam fora — o veredito que importa é
 o do IP onde o bot roda.
 
+### 🟡 12. Lacuna de análise estática no CI (era GAP declarado — fechado)
+
+O `flake8` do CI só reprova em erro de sintaxe e nome indefinido; nada procurava **padrão de
+risco**. Acrescentado `bandit`, que **reprova a build**. Achados na primeira execução: 11
+(9 baixos, 2 médios, 0 altos).
+
+**Os 3 achados REAIS foram corrigidos, não suprimidos:** três `except Exception: pass` mudos em
+`extract_entry_media_urls` (B110). Uma entrada de feed com media malformada perdia a imagem
+**sem deixar rasto**. Passam a registar a causa em `log.debug` — o feed continua a ser
+processado, porque falta de imagem não pode derrubar a notícia.
+
+**Os 2 de severidade média eram falsos positivos**, e a leitura importa: o `bandit` marca a
+*string* `"0.0.0.0"`, e os dois usos são o **oposto** de vincular a todas as interfaces — um
+está na lista de domínios **bloqueados** e o outro numa comparação que **avisa** que o bind
+ficou aberto. Marcar sem ler teria "corrigido" código que já era a proteção.
+
+As 6 exceções são `# nosec BXXX` no ponto exato, com o motivo na linha acima — nominal e
+auditável, em vez de desligar o teste inteiro no config, que é o afrouxamento criticado no
+achado 3.
+
+**Calibração (o instrumento sabe reprovar?):** arquivo-controle com
+`subprocess.check_output(cmd, shell=True)` → `B602 subprocess_popen_with_shell_equals_true`,
+**Severity: High**, exit 1. E o projeto, depois do trabalho: exit 0.
+
 ---
 
 ## Testes executados
@@ -360,8 +384,9 @@ execução.
    feeds mais movimentados. A perda deixou de ser silenciosa (agora avisa), mas continua a
    existir. O valor do teto e do intervalo é decisão de produto — muda o volume que chega ao
    canal do Paulo — e por isso não foi alterado por conta própria.
-6. **Análise estática dedicada continua ausente** no pipeline (o `flake8` do CI só reprova em
-   erro de sintaxe e nome indefinido). GAP declarado, não fechado nesta sessão.
+6. ~~Análise estática dedicada ausente no pipeline.~~ **FECHADO ainda nesta sessão** — ver
+   achado 12 abaixo. Estava escrito aqui como GAP e não passava no teste das três perguntas
+   (é reversível, está no escopo do pedido, e eu sabia como fazer), então virou trabalho.
 
 ## Veredito
 

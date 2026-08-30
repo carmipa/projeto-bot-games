@@ -1,4 +1,6 @@
-import subprocess
+# B404: o unico uso de subprocess neste projeto e `git log` com lista fixa de argumentos,
+# sem shell e sem nenhuma entrada do utilizador. Auditado em 2026-07-12 por causa disso.
+import subprocess  # nosec B404
 import logging
 
 log = logging.getLogger("GameBot")
@@ -11,7 +13,8 @@ def get_git_changes():
     try:
         # Último commit (hash curto + mensagem). shell=False + lista de args evita injeção de shell.
         cmd = ["git", "log", "-1", "--pretty=format:%h - %s"]
-        output = subprocess.check_output(cmd, stderr=subprocess.DEVNULL).decode('utf-8').strip()
+        # lista fixa de argumentos, shell=False por omissao, zero entrada externa do utilizador
+        output = subprocess.check_output(cmd, stderr=subprocess.DEVNULL).decode('utf-8').strip()  # nosec B603
         return output
     except Exception as e:
         log.debug(f"Git info fetch failed: {e}")
@@ -23,7 +26,8 @@ def get_current_hash():
     """
     try:
         cmd = ["git", "log", "-1", "--pretty=format:%h"]
-        return subprocess.check_output(cmd, stderr=subprocess.DEVNULL).decode('utf-8').strip()
+        # lista fixa de argumentos, shell=False por omissao, zero entrada externa do utilizador
+        return subprocess.check_output(cmd, stderr=subprocess.DEVNULL).decode('utf-8').strip()  # nosec B603
     except Exception as e:
         log.debug(f"Falha ao obter hash do Git: {e}")
         return None

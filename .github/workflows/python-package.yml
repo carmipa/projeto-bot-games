@@ -31,7 +31,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install flake8 pytest pip-audit
+        python -m pip install flake8 pytest pip-audit bandit
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
     - name: Lint with flake8
       run: |
@@ -44,6 +44,22 @@ jobs:
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    # Fecha a lacuna "analise estatica dedicada", ate aqui um GAP declarado. O flake8 acima
+    # so pega erro de sintaxe e nome indefinido; o bandit procura padrao de risco
+    # (shell=True, eval, bind aberto, except mudo, subprocess com entrada externa).
+    #
+    # REPROVA a build. As excecoes sao `# nosec BXXX` no ponto exato, com o motivo escrito
+    # na linha acima — nominal e auditavel, em vez de um skip do teste inteiro no config.
+    # Hoje sao 6, todas verificadas: 2 falsos positivos de B104 (a string "0.0.0.0" aparece
+    # numa lista de BLOQUEIO e numa comparacao que AVISA sobre o bind), 3 de B311 (`random`
+    # para jitter e rotacao de User-Agent, que sao camuflagem e nao criptografia) e 1 de
+    # B404/B603 (`git log` com lista fixa de args, sem shell e sem entrada externa).
+    # Os 3 achados REAIS (`except Exception: pass` mudo em extract_entry_media_urls) foram
+    # corrigidos, nao suprimidos.
+    - name: Static analysis (bandit)
+      run: |
+        bandit -r bot core utils web scripts main.py settings.py -q
+
     - name: Test with pytest
       run: |
         pytest

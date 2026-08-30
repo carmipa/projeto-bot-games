@@ -450,8 +450,8 @@ def extract_entry_media_urls(entry: Any) -> tuple[str | None, str | None]:
                     image_url = url
                 if ("video" in mtype or _is_probable_video_url(url)) and not video_url:
                     video_url = url
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug("media_content ilegivel na entrada (%s: %s)", type(e).__name__, e)
 
     try:
         media_thumb = getattr(entry, "media_thumbnail", None) or []
@@ -462,8 +462,8 @@ def extract_entry_media_urls(entry: Any) -> tuple[str | None, str | None]:
                     if url:
                         image_url = image_url or url
                         break
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug("media_thumbnail ilegivel na entrada (%s: %s)", type(e).__name__, e)
 
     try:
         links = getattr(entry, "links", None) or []
@@ -480,8 +480,8 @@ def extract_entry_media_urls(entry: Any) -> tuple[str | None, str | None]:
                     image_url = href
                 if ("video" in ltype or _is_probable_video_url(href)) and not video_url:
                     video_url = href
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug("links/enclosure ilegiveis na entrada (%s: %s)", type(e).__name__, e)
 
     if image_url and not image_url.startswith(("http://", "https://")):
         image_url = None
@@ -904,7 +904,9 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                     feeds_blocked_security += 1
                     return None
 
-                jitter = random.uniform(
+                # B311: `random` nao-criptografico basta — este numero so espaca as
+                # requisicoes para nao parecerem uma rajada. Nao e segredo.
+                jitter = random.uniform(  # nosec B311
                     min(FEED_FETCH_JITTER_MIN, FEED_FETCH_JITTER_MAX),
                     max(FEED_FETCH_JITTER_MIN, FEED_FETCH_JITTER_MAX),
                 )

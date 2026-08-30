@@ -4,7 +4,9 @@ from settings import BROWSER_USER_AGENTS
 
 def get_robust_headers() -> Dict[str, str]:
     """Gera um conjunto de headers robustos para simular um navegador real."""
-    ua = random.choice(BROWSER_USER_AGENTS)
+    # B311: `random` nao-criptografico e adequado aqui — o User-Agent e camuflagem contra
+    # bloqueio de scraping, nao segredo nem decisao de seguranca.
+    ua = random.choice(BROWSER_USER_AGENTS)  # nosec B311
     referers = [
         "https://www.google.com/",
         "https://www.bing.com/",
@@ -20,7 +22,7 @@ def get_robust_headers() -> Dict[str, str]:
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9,pt-BR;q=0.8",
         "Accept-Encoding": "gzip, deflate, br",
-        "Referer": random.choice(referers),
+        "Referer": random.choice(referers),  # nosec B311
         "DNT": "1",
         "Connection": "keep-alive",
         "Upgrade-Insecure-Requests": "1",

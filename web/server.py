@@ -181,7 +181,9 @@ async def start_web_server(host=None, port=None):
         log.warning(f"⚠️ Web Dashboard iniciado em http://{server_host}:{server_port} SEM autenticação!")
         log.warning("⚠️ Configure WEB_AUTH_TOKEN no .env para produção!")
     
-    if server_host == "0.0.0.0":
+    # Falso positivo do bandit (B104): esta comparacao existe para AVISAR que o bind
+    # ficou aberto, nao para o abrir.
+    if server_host == "0.0.0.0":  # nosec B104
         log.warning("⚠️ Servidor web escutando em 0.0.0.0 (acessível de qualquer IP)!")
         log.warning("⚠️ Considere usar 127.0.0.1 ou configurar firewall adequadamente!")
 
