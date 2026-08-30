@@ -11,8 +11,9 @@ import os
 from datetime import datetime
 from functools import wraps
 
+from core import telemetria
 from core.stats import stats
-from utils.storage import p
+from utils.storage import p, load_json_safe
 from settings import LOG_LEVEL
 
 # Logger FILHO de "GameBot", não um logger irmão. Como "GameNewsWeb", este módulo não
@@ -148,12 +149,19 @@ async def index(request):
 @security_headers_middleware
 async def api_stats(request):
     """API JSON para atualizar status via AJAX."""
+    # A saude vem do state.json, nao da memoria: sobrevive a reinicio do container, que e
+    # justamente quando se quer saber o que aconteceu antes.
+    estado = load_json_safe(p("state.json"), {})
+    registo = telemetria.ultima(estado)
     return web.json_response({
         "uptime": stats.format_uptime(),
         "scans": stats.scans_completed,
         "news_posted": stats.news_posted,
+        "feeds_failed": stats.feeds_failed,
         "cache_hits": stats.cache_hits_total,
-        "last_scan": stats.last_scan_time.isoformat() if stats.last_scan_time else "Never"
+        "last_scan": stats.last_scan_time.isoformat() if stats.last_scan_time else "Never",
+        "saude": registo,
+        "vereditos_recentes": telemetria.vereditos_recentes(estado),
     })
 
 async def start_web_server(host=None, port=None):

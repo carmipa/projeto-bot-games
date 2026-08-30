@@ -1,6 +1,7 @@
 """
 Scanner module - Feed fetching and processing logic.
 """
+import hashlib
 import ssl
 import asyncio
 import logging
@@ -47,6 +48,8 @@ from utils.translator import translate_to_target, t
 from utils.security import validate_url_async, sanitize_log_message
 from utils.http import get_robust_headers
 from core.stats import stats
+from core import telemetria
+from utils.translator import degradacoes_totais
 from core.filters import should_post_to_guild, should_skip_by_content
 from core.html_monitor import check_official_sites
 from utils.discord_link_buttons import (
@@ -769,6 +772,33 @@ def _log_next_run() -> None:
     )
 
 
+def _registar_saida_precoce(trigger: str, **contagens) -> None:
+    """
+    PROPÓSITO DE NEGÓCIO: fazer com que a varredura que desiste no portão de entrada
+    deixe rasto, em vez de terminar em silêncio.
+
+    INVARIANTES DO DOMÍNIO: as saídas antecipadas (nenhuma guild configurada, catálogo
+    vazio) são a AUSÊNCIA MAIS GRAVE que existe — o bot não tentou sequer. Sem registo, o
+    `/status` mostraria o veredito da varredura anterior, que pode ser um `OK` de dias
+    atrás, e o painel diria que está tudo bem enquanto nada acontece.
+
+    COMPORTAMENTO EM CASO DE FALHA: qualquer erro ao ler ou gravar o estado é apanhado e
+    registado; não impede a saída antecipada nem levanta. Perder telemetria é mau; impedir
+    o bot de sair de um portão de entrada seria pior.
+    """
+    try:
+        caminho = p("state.json")
+        estado = load_json_safe(caminho, {})
+        if not isinstance(estado, dict):
+            estado = {}
+        registo = telemetria.resumir(telemetria.Contadores(trigger=trigger, **contagens))
+        telemetria.registar(estado, registo)
+        save_json_safe(caminho, estado)
+        log.error("🔴 [Saúde] %s — %s", registo.veredito, registo.motivo)
+    except Exception as e:
+        log.warning("não foi possível registar a saúde da saída antecipada: %s", e)
+
+
 async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
     """
     Executa UMA varredura completa.
@@ -819,14 +849,30 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
         # Verifica se há guilds configuradas
         if not config or not any(isinstance(v, dict) and v.get("channel_id") for v in config.values()):
             log.warning("⚠️ Nenhuma guild configurada com 'channel_id'. Use /set_canal ou /dashboard para configurar.")
+            _registar_saida_precoce(trigger)
             _log_next_run()
             return
             
         urls = load_sources()
         if not urls:
             log.warning("Nenhuma URL válida em sources.json.")
+            _registar_saida_precoce(trigger)
             _log_next_run()
             return
+
+        # Impressão digital do catálogo em uso. Existe por causa de um defeito real: no
+        # Docker o `sources.json` ficava congelado no volume, e o contêiner lia um catálogo
+        # antigo depois de cada rebuild — em silêncio. O caminho e a contagem no log fazem
+        # "adicionei fontes e não mudou nada" virar uma linha comparável, em vez de uma
+        # suspeita. O hash distingue duas versões com o mesmo número de fontes.
+        _caminho_catalogo = p("sources.json")
+        _digest = hashlib.sha256(
+            "\n".join(urls).encode("utf-8", errors="ignore")
+        ).hexdigest()[:12]
+        log.info(
+            "📚 [Catálogo] %s fontes | sha=%s | arquivo=%s",
+            len(urls), _digest, _caminho_catalogo,
+        )
 
         # =========================================================
         # UNIFIED STATE MANAGEMENT & AUTO-CLEANUP
@@ -884,6 +930,14 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
         feeds_errors = 0
         feeds_blocked_security = 0
         entries_undated_skipped = 0
+        # Telemetria de ausencia: sem estes tres nao ha como distinguir "0 publicados
+        # porque nao havia" de "0 publicados porque quebrou". itens_novos conta o que
+        # passou o dedup; itens_filtrados o que foi descartado de proposito; a diferenca
+        # entre eles e os publicados e a invariante de conservacao (telemetria.py).
+        itens_novos = 0
+        itens_filtrados = 0
+        entregas_falhadas = 0
+        degradacoes_no_inicio = degradacoes_totais()
         
         semaphore = asyncio.Semaphore(MAX_CONCURRENT_FEEDS)
         RSS_BACKOFF = [RSS_RETRY_BACKOFF_BASE * (2 ** i) for i in range(max(1, RSS_MAX_RETRIES))]
@@ -1127,6 +1181,8 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                         state["dedup"][url].append(link)
                         continue
 
+                    itens_novos += 1
+
                     # Cold Start: Respeitando pedido de "sem limitação", removemos a trava rígida de 3 posts.
                     # O dedup cuidará das duplicatas nas próximas rodadas.
                     # if is_cold_start and feed_posted_count >= 3: continue # Removido
@@ -1138,10 +1194,12 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                         age = now - entry_dt
                         if age.days > MAX_NEWS_AGE_DAYS:
                             log.debug(f"👴 [Old] Ignorado (idade {age.days}d, máx. {MAX_NEWS_AGE_DAYS} dias): {link}")
+                            itens_filtrados += 1
                             continue
                     elif REQUIRE_ENTRY_DATE:
                         entries_undated_skipped += 1
                         log.debug(f"🕒 [Undated] Ignorado por falta de data no feed: {link}")
+                        itens_filtrados += 1
                         continue
 
                     title = entry.get("title") or ""
@@ -1153,9 +1211,11 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                     # Filtro de conteúdo (LIXO_FILTER): descarta ruído e loga
                     if should_skip_by_content(title, summary):
                         log.debug(f"🛡️ [Filtro] Ruído filtrado: {title[:50]}...")
+                        itens_filtrados += 1
                         continue
                     if should_skip_generic_youtube_false_positive(url, title, link):
                         log.debug(f"🛡️ [Filtro] YouTube genérico sem sinal de jogo no título: {title[:60]}...")
+                        itens_filtrados += 1
                         continue
 
                     # Regra extra: filtrar YouTube Shorts que não sejam claramente trailers/anúncios de jogos
@@ -1171,6 +1231,7 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                         )
                         if not any(kw in title_lower for kw in allowed_short_kw):
                             log.debug(f"🛡️ [Filtro] YouTube Shorts descartado: {title[:50]}...")
+                            itens_filtrados += 1
                             continue
 
                     # GRC: vídeos YouTube com mais de 12 min são descartados (podcasts/entrevistas), exceto Official Gameplay / Reveal
@@ -1180,9 +1241,13 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                             title_lower = (title or "").lower()
                             if "official gameplay" not in title_lower and "reveal" not in title_lower:
                                 log.debug(f"🛡️ [Filtro] Vídeo longo descartado ({duration_sec // 60} min): {title[:50]}...")
+                                itens_filtrados += 1
                                 continue
 
                     posted_anywhere = False
+                    # Por ITEM, não por feed: `falha_de_entrega` diz que algo correu mal
+                    # neste feed, mas a conservação precisa de saber qual ITEM não saiu.
+                    entrega_falhou_neste_item = False
                     t_clean = clean_html(title).strip()
                     s_clean = clean_html(summary).strip()[:2000]
                     # Cache de tradução por idioma para esta notícia (título + resumo)
@@ -1206,6 +1271,7 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                         if channel is None:
                             log.warning(f"Canal {channel_id} não encontrado.")
                             falha_de_entrega = True
+                            entrega_falhou_neste_item = True
                             continue
 
                         # Tradução
@@ -1262,23 +1328,36 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
                         except discord.Forbidden as e:
                             log.error(f"🚫 Sem permissão para enviar mensagem no canal {channel_id} (guild {gid}): {e}")
                             falha_de_entrega = True
+                            entrega_falhou_neste_item = True
                         except discord.HTTPException as e:
                             log.error(f"🌐 Erro HTTP ao enviar mensagem no canal {channel_id}: {e.status} - {e.text}")
                             falha_de_entrega = True
+                            entrega_falhou_neste_item = True
                         except (ValueError, TypeError) as e:
                             # discord.py 2.x removeu discord.InvalidArgument; embed/botão inválido
                             # lança ValueError/TypeError. Sem este catch, o erro abortava a varredura.
                             log.error(f"⚠️ Argumento inválido ao criar embed/mensagem: {type(e).__name__}: {e}")
                             falha_de_entrega = True
+                            entrega_falhou_neste_item = True
                         except Exception as e:
                             log.exception(f"❌ Falha inesperada ao enviar no canal {channel_id} (guild {gid}): {type(e).__name__}: {e}")
                             falha_de_entrega = True
+                            entrega_falhou_neste_item = True
 
                     if posted_anywhere:
                         # Adiciona ao dedup específico e global
                         state["dedup"][url].append(link)
                         history_set.add(link)
                         history_list.append(link)
+                    elif entrega_falhou_neste_item:
+                        # Terceira porta da conservacao: o item existia, foi aprovado e
+                        # NAO saiu por falha de entrega. Sem esta contagem, a conservacao
+                        # acusaria "item sumido" e esconderia a causa verdadeira.
+                        entregas_falhadas += 1
+                    else:
+                        # Nenhuma guild aprovou e nada falhou: foi decisao de filtro, nao
+                        # perda.
+                        itens_filtrados += 1
 
                 # O ETag/Last-Modified só entra no cache depois que o feed inteiro foi
                 # processado SEM falha de entrega. É o que garante que "não consegui postar"
@@ -1295,14 +1374,43 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
         # =========================================================
         # HTML MONITOR RUN (SITE WATCHER)
         # =========================================================
-        sent_count += await _run_html_monitor(bot, config, state, html_hashes)
+        # Separados de proposito: alerta de site mudado nao e noticia, e misturar os dois
+        # num contador so impediria a telemetria de dizer "0 noticias, mas 2 alertas".
+        noticias_publicadas = sent_count
+        alertas_html = await _run_html_monitor(bot, config, state, html_hashes)
+        sent_count += alertas_html
 
         # Salva TUDO em um único arquivo de forma atômica/safe
         save_history(history_list)
+        # Telemetria calculada ANTES do merge+save: assim o registo de saude entra na
+        # mesma (unica) escrita de state.json e passa pela reconciliacao com o disco.
+        # Uma segunda escrita depois do save abriria de novo a janela de lost-update
+        # que o merge existe para fechar.
+        contadores = telemetria.Contadores(
+            trigger=trigger,
+            fontes_total=total_feeds if 'total_feeds' in locals() else len(urls),
+            fontes_com_erro=feeds_errors,
+            fontes_vazias=feeds_empty,
+            fontes_bloqueadas=feeds_blocked_security,
+            cache_304=cache_hits,
+            itens_novos=itens_novos,
+            itens_filtrados=itens_filtrados,
+            itens_publicados=noticias_publicadas,
+            alertas_html=alertas_html,
+            entregas_falhadas=entregas_falhadas,
+            traducoes_degradadas=degradacoes_totais() - degradacoes_no_inicio,
+            duracao_s=time.time() - scan_start_time,
+        )
+        registo = telemetria.resumir(contadores)
+        telemetria.registar(state, registo)
+
         # Recarrega o state do disco e preserva chaves escritas por comandos DURANTE o scan
         # (ex.: last_announced_hash gravado pelo main.py). A varredura só é dona destas chaves;
         # o resto é mesclado do disco para não sofrer lost-update numa janela de até 125 min.
-        _scan_owned = ("dedup", "http_cache", "html_hashes", "youtube_feed_cache", "source_failures", "last_cleanup")
+        _scan_owned = (
+            "dedup", "http_cache", "html_hashes", "youtube_feed_cache",
+            "source_failures", "last_cleanup", telemetria.CHAVE_ESTADO,
+        )
         disk_state = load_json_safe(state_file, {})
         if isinstance(disk_state, dict):
             for _k, _v in disk_state.items():
@@ -1313,21 +1421,36 @@ async def run_scan_once(bot: discord.Client, trigger: str = "manual") -> None:
         stats.scans_completed += 1
         stats.news_posted += sent_count
         stats.cache_hits_total += cache_hits
+        stats.feeds_failed += feeds_errors + feeds_blocked_security
         stats.last_scan_time = datetime.now()
-        
-        log.info(
-            "📊 [Scan Summary] total_feeds=%s | feeds_com_erro=%s | feeds_vazios=%s | "
-            "feeds_bloqueados_seguranca=%s | sem_data_descartadas=%s | cache_304=%s | posts_enviados=%s | trigger=%s",
-            total_feeds if 'total_feeds' in locals() else len(urls),
-            feeds_errors,
-            feeds_empty,
-            feeds_blocked_security,
-            entries_undated_skipped,
-            cache_hits,
-            sent_count,
-            trigger,
+
+        # =========================================================
+        # TELEMETRIA DE AUSENCIA
+        # =========================================================
+        # O resumo antigo despejava numeros e deixava a interpretacao para quem lesse o
+        # log. Numero mudo nao diz se `posts_enviados=0` e um dia calmo ou o bot partido —
+        # e foi assim que o `on_ready` abortado e o sources.json congelado passaram
+        # despercebidos. Agora a varredura emite VEREDITO com MOTIVO, e persiste-o.
+
+        nivel = {
+            telemetria.VEREDITO_ANOMALIA: log.error,
+            telemetria.VEREDITO_ATENCAO: log.warning,
+        }.get(registo.veredito, log.info)
+        emoji = {
+            telemetria.VEREDITO_ANOMALIA: "🔴",
+            telemetria.VEREDITO_ATENCAO: "🟡",
+        }.get(registo.veredito, "🟢")
+        nivel(
+            "%s [Saúde] %s — %s | fontes %s/%s ok, %s erro, %s vazias, %s bloqueadas | "
+            "304=%s | itens: %s novos, %s filtrados, %s publicados, %s alertas | "
+            "entregas falhadas=%s | traduções degradadas=%s | %.1fs | trigger=%s",
+            emoji, registo.veredito, registo.motivo,
+            registo.fontes_ok, registo.fontes_total, registo.fontes_com_erro,
+            registo.fontes_vazias, registo.fontes_bloqueadas, registo.cache_304,
+            registo.itens_novos, registo.itens_filtrados, registo.itens_publicados,
+            registo.alertas_html, registo.entregas_falhadas,
+            registo.traducoes_degradadas, registo.duracao_s, registo.trigger,
         )
-        log.info(f"✅ Varredura concluída. (enviadas={sent_count}, cache_hits={cache_hits}/{len(urls)}, trigger={trigger})")
         _log_next_run()
 
 

@@ -7,8 +7,10 @@ from discord.ext import commands
 from discord import app_commands
 from datetime import datetime, timedelta
 
+from core import telemetria
 from core.stats import stats
 from settings import LOOP_MINUTES
+from utils.storage import p, load_json_safe
 
 log = logging.getLogger("GameBot")
 
@@ -77,6 +79,66 @@ class StatusCog(commands.Cog):
             inline=True
         )
         
+        # Saúde ANTES dos números, ocupando a linha inteira. Um contador de varreduras não
+        # diz se elas estão a funcionar: foi um painel só de sucessos que deixou o bot ficar
+        # online sem varrer e o catálogo congelar no Docker sem ninguém notar.
+        # Lido do state.json e não da memória — sobrevive a reinício do contêiner, que é
+        # justamente quando se quer saber o que aconteceu antes.
+        estado_disco = load_json_safe(p("state.json"), {})
+        registo = telemetria.ultima(estado_disco) or {}
+        veredito = registo.get("veredito")
+        emoji_saude = {
+            telemetria.VEREDITO_ANOMALIA: "🔴",
+            telemetria.VEREDITO_ATENCAO: "🟡",
+            telemetria.VEREDITO_OK: "🟢",
+        }.get(veredito, "⚪")
+
+        if veredito:
+            linhas_saude = [f"{emoji_saude} **{veredito}** — {registo.get('motivo', '')}"]
+        else:
+            linhas_saude = ["⚪ Nenhuma varredura registada ainda."]
+
+        atrasada, motivo_atraso = telemetria.varredura_atrasada(estado_disco, LOOP_MINUTES)
+        if atrasada:
+            linhas_saude.append(f"🔴 **Agendador suspeito:** {motivo_atraso}")
+
+        embed.add_field(
+            name="🩺 Saúde da última varredura",
+            value="\n".join(linhas_saude)[:1024],
+            inline=False,
+        )
+
+        if veredito:
+            embed.add_field(
+                name="🔎 Fontes",
+                value="\n".join([
+                    f"{registo.get('fontes_ok', 0)}/{registo.get('fontes_total', 0)} ok",
+                    f"{registo.get('fontes_com_erro', 0)} com erro",
+                    f"{registo.get('fontes_vazias', 0)} vazias",
+                ]),
+                inline=True,
+            )
+            embed.add_field(
+                name="📥 Itens",
+                value="\n".join([
+                    f"{registo.get('itens_novos', 0)} novos",
+                    f"{registo.get('itens_filtrados', 0)} filtrados",
+                    f"{registo.get('itens_publicados', 0)} publicados",
+                ]),
+                inline=True,
+            )
+            degradadas = registo.get("traducoes_degradadas", 0)
+            falhadas = registo.get("entregas_falhadas", 0)
+            if degradadas or falhadas:
+                embed.add_field(
+                    name="⚠️ Degradações",
+                    value="\n".join([
+                        f"{degradadas} traduções degradadas",
+                        f"{falhadas} entregas falhadas",
+                    ]),
+                    inline=True,
+                )
+
         embed.add_field(
             name="📡 Varreduras",
             value=f"{stats.scans_completed}",

@@ -4,6 +4,57 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 
 ---
 
+## [2.4.0] - 2026-08-30 — Telemetria de ausência, e uma porta para o tradutor
+
+Resposta à pergunta "vale a pena incluir desacoplamento e telemetria?": telemetria sim,
+uma porta sim, fatias verticais não — a regra de arquitetura do vault (§2 *duplicação
+consciente > acoplamento*, §6 *não elevar fatia isolada*) desaconselha reescrever um bot de
+uma fatia só.
+
+### Telemetria de ausência
+- **O painel media só sucesso.** `scans_completed`, `news_posted`, `cache_hits` — e um
+  `feeds_failed` **definido e nunca incrementado**, um campo que sempre dizia `0`,
+  indistinguível de "nada falhou". Sete dos doze defeitos desta semana teriam aparecido num
+  painel que medisse ausência.
+- Cada varredura passa a emitir **VEREDITO com MOTIVO** (`OK` / `ATENCAO` / `ANOMALIA`),
+  persistido em `state.json` e exposto no `/status` e no `/api/stats`. O zero legítimo é
+  dito com todas as letras — *"não havia novidade: as 92 fontes saudáveis responderam 304"* —
+  porque alarmar em dia calmo treina o operador a ignorar o alarme.
+- **Invariante de conservação:** todo item que passa o dedup sai por uma de três portas —
+  publicado, filtrado ou com entrega falhada. Qualquer diferença é ANOMALIA. É a telemetria
+  a auditar-se a si própria: um `continue` novo que esqueça de contar passa a reprovar.
+- **Agendador morto é detectado** comparando o relógio com o último registo — o defeito do
+  `on_ready` abortado, que deixava o bot online sem nunca varrer.
+- **Saídas antecipadas também registam.** Sem guild configurada ou catálogo vazio é a
+  ausência mais grave (o bot nem tentou) e antes terminava em silêncio, deixando o `/status`
+  a mostrar um `OK` de dias atrás.
+- **Impressão digital do catálogo no arranque** (contagem + sha + caminho): faz "adicionei
+  fontes e não mudou nada" virar uma linha comparável no log.
+
+### Porta do tradutor
+- `utils/portas.py`: `TradutorPort`, `ContratoDaPortaViolado` e `DegradacaoAceitavel`. É o
+  único desacoplamento que a regra manda ter aqui (§5.5, *toda saída passa por porta
+  declarada*) e o único com dano medido atrás dele — nenhum `try/except` teria apanhado o
+  incidente de ontem, porque o adaptador estava a **mentir dentro do contrato**, não a
+  falhar fora dele. Vive em `utils/` e não em `core/` porque o kernel não pode importar da
+  fatia (invariante 1 da regra).
+
+### Achados durante a implementação, todos apanhados pelos próprios testes
+- O detector reportava **catálogo vazio como `OK`** — tinha o buraco exatamente na falha que
+  existe para apanhar.
+- Um ramo de decisão era **inalcançável** (a conservação já o cobria). Removido: ramo morto
+  numa função de decisão sugere cobertura que não existe.
+- A conservação tinha **duas portas em vez de três**, e mascarava "entrega falhou" com "item
+  sumido" — veredito certo, diagnóstico errado.
+- O portão de lint apanhou um `global` para nome só lido (F824), a mesma classe de ontem.
+
+### Testes
+- **135 → 167.** Cada regra de veredito tem par: o cenário que TEM de alarmar e o gêmeo
+  saudável que TEM de ficar calado. Calibração principal: remover a contagem de **um**
+  `continue` faz a invariante de conservação reprovar.
+
+---
+
 ## [2.3.1] - 2026-08-30 — Tradutor devolvia página de erro e ela ia para o canal
 
 Achado **em produção**, na primeira execução real desde 2026-03-27. O canal recebeu

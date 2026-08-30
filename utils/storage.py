@@ -177,6 +177,7 @@ def get_state_stats(state: Dict[str, Any]) -> Dict[str, Any]:
         Dicionário com estatísticas
     """
     stats = {
+        "ultima_saude": None,
         "dedup_feeds": 0,
         "dedup_total_links": 0,
         "http_cache_urls": 0,
@@ -187,6 +188,13 @@ def get_state_stats(state: Dict[str, Any]) -> Dict[str, Any]:
         "last_announced_hash": state.get("last_announced_hash"),
         "file_size_kb": 0
     }
+
+    saude = state.get("saude_varredura")
+    if isinstance(saude, dict) and isinstance(saude.get("ultima"), dict):
+        ultima = saude["ultima"]
+        stats["ultima_saude"] = (
+            f"{ultima.get('veredito', '?')} — {ultima.get('motivo', 'sem motivo registado')}"
+        )
 
     for chave in ("youtube_feed_cache", "source_failures"):
         valor = state.get(chave, {})
@@ -229,7 +237,11 @@ def get_state_stats(state: Dict[str, Any]) -> Dict[str, Any]:
 # Toda chave nova em state.json TEM de entrar numa destas duas listas — a guarda em
 # tests/test_clean_state_chaves.py falha se alguém acrescentar estado sem classificar.
 CHAVES_LIMPAVEIS = ("dedup", "http_cache", "html_hashes", "youtube_feed_cache", "source_failures")
-METADADOS_PRESERVADOS = ("last_cleanup", "last_announced_hash")
+# `saude_varredura` sobrevive ate a um `tudo` DE PROPOSITO: e o rasto de diagnostico, e
+# apaga-lo numa limpeza destruiria a evidencia exatamente quando se esta a investigar o
+# incidente que motivou a limpeza. Nao ocupa espaco relevante — o historico e limitado em
+# core/telemetria.py.
+METADADOS_PRESERVADOS = ("last_cleanup", "last_announced_hash", "saude_varredura")
 
 
 def clean_state(state: Dict[str, Any], clean_type: str) -> Tuple[Dict[str, Any], Dict[str, Any]]:

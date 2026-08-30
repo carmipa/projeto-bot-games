@@ -8,6 +8,7 @@ from collections import OrderedDict
 from typing import Dict, Any, Optional
 from deep_translator import GoogleTranslator
 
+from utils.portas import ContratoDaPortaViolado
 from utils.storage import p, load_json_safe
 
 log = logging.getLogger("GameBot")
@@ -157,6 +158,10 @@ _FALHAS_ATE_DEGRADAR = 5
 _DEGRADACAO_SEGUNDOS = 600
 _falhas_consecutivas = 0
 _degradado_ate = 0.0
+# Cumulativo desde o arranque. A telemetria de ausencia le a diferenca entre varreduras
+# para poder dizer "publicado sem traducao" — sem contador, essa degradacao so apareceria
+# no canal, que foi exatamente como o incidente de 2026-08-30 foi descoberto.
+_degradacoes_totais = 0
 
 
 def _traducao_utilizavel(trad) -> bool:
@@ -182,8 +187,9 @@ def _traducao_utilizavel(trad) -> bool:
 
 def _registrar_falha() -> None:
     """Conta a falha e abre o disjuntor quando elas se acumulam."""
-    global _falhas_consecutivas, _degradado_ate
+    global _falhas_consecutivas, _degradado_ate, _degradacoes_totais
     _falhas_consecutivas += 1
+    _degradacoes_totais += 1
     if _falhas_consecutivas >= _FALHAS_ATE_DEGRADAR and time.monotonic() >= _degradado_ate:
         _degradado_ate = time.monotonic() + _DEGRADACAO_SEGUNDOS
         log.error(
@@ -195,11 +201,17 @@ def _registrar_falha() -> None:
 
 
 def _reset_estado_do_tradutor() -> None:
-    """Zera contador, disjuntor e cache. Existe para os testes não herdarem estado."""
-    global _falhas_consecutivas, _degradado_ate
+    """Zera contadores, disjuntor e cache. Existe para os testes não herdarem estado."""
+    global _falhas_consecutivas, _degradado_ate, _degradacoes_totais
     _falhas_consecutivas = 0
     _degradado_ate = 0.0
+    _degradacoes_totais = 0
     _translation_cache.clear()
+
+
+def degradacoes_totais() -> int:
+    """Quantas vezes se publicou sem traduzir desde o arranque. Lido pela telemetria."""
+    return _degradacoes_totais
 
 
 async def translate_to_target(text: str, target_lang: str) -> str:
@@ -258,12 +270,18 @@ async def translate_to_target(text: str, target_lang: str) -> str:
         _registrar_falha()
         return text
 
-    if not _traducao_utilizavel(trad):
-        log.warning(
-            "🌐 Tradução recusada: o serviço respondeu com sucesso mas devolveu conteúdo "
-            "de página de erro (%r...). Publicando o texto original.",
-            (trad or "")[:60],
-        )
+    try:
+        if not _traducao_utilizavel(trad):
+            # Violação de CONTRATO, não falha de rede: o adaptador respondeu com sucesso e
+            # devolveu lixo. A distinção importa — foi por confundir as duas que a página
+            # de erro do Google acabou publicada como notícia.
+            raise ContratoDaPortaViolado(
+                "tradutor",
+                "resposta bem-sucedida com conteúdo de página de erro",
+                str(trad or ""),
+            )
+    except ContratoDaPortaViolado as violacao:
+        log.warning("🌐 %s. Publicando o texto original.", violacao)
         _registrar_falha()
         return text
 
