@@ -363,6 +363,15 @@ execução.
 
 ## Riscos residuais declarados
 
+0. **CORRIGIDO NO DIA SEGUINTE, e o risco 1 abaixo era exatamente isto.** Em 2026-08-30 o
+   bot subiu em produção e o canal recebeu notícias cujo título e resumo eram a página de
+   erro do Google (`Error 500 (Server Error)!!1...`). O `deep_translator` devolve o texto
+   da página como se fosse tradução, e o único guarda era `if trad is None`. **A auditoria
+   não exercitou o caminho de falha do tradutor** — nem a revisão de falha operacional, que
+   lista "resposta externa contraditória" e deveria ter feito a pergunta. Ver a entrada
+   `[2.3.1]` do CHANGELOG. O que o incidente confirma: guarda que não roda contra o serviço
+   real não prova nada sobre o serviço real.
+
 1. **Nada foi validado com o bot conectado ao Discord.** O bot não roda desde 2026-03-27, e
    esta sessão não o ligou. Tudo o que depende de gateway real — `on_ready` completo, o
    agendador numa reconexão de verdade, publicação real no canal — está **provado por teste

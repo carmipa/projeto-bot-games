@@ -4,6 +4,43 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 
 ---
 
+## [2.3.1] - 2026-08-30 — Tradutor devolvia página de erro e ela ia para o canal
+
+Achado **em produção**, na primeira execução real desde 2026-03-27. O canal recebeu
+notícias cujo título e resumo eram, os dois:
+`Error 500 (Server Error)!!1500.That's an error.There was an error. Please try again
+later.That's all we know.`
+
+### Crítico
+- **`deep_translator` não levanta exceção quando o Google responde com página de erro** —
+  devolve o *texto* da página como se fosse a tradução. O único guarda era
+  `if trad is None`, que uma string nunca aciona. A cadeia de dano tinha três elos:
+  a página era publicada como título e resumo; era **gravada no cache LRU**, repetindo-se
+  para todo texto igual; e o envio "teve sucesso", então o link entrava no dedup — a
+  notícia verdadeira **nunca mais** sairia, nem depois de o tradutor voltar ao normal.
+  O terceiro elo é o caro, e é a mesma classe do ETag gravado antes da entrega:
+  *"entreguei lixo" contava como "entreguei"*.
+- A resposta do tradutor passa a ser validada. Inválida ⇒ publica o **texto original**
+  (notícia em inglês continua a ser notícia; página de erro não é), **não** entra no cache,
+  e sai em WARNING — degradação visível tem de aparecer no log.
+- **Disjuntor:** após 5 falhas seguidas, 10 minutos publicando sem traduzir, sem sequer
+  chamar o serviço. Insistir durante um bloqueio por excesso de pedidos só o prolonga — e
+  a rajada de cold start das 25 fontes novas é o gatilho provável do incidente.
+
+### Recuperação
+- `scripts/repor_noticias_perdidas.py`: esquece o dedup e o histórico de uma fonte para que
+  as notícias publicadas como lixo voltem ao canal. Faz backup antes e aborta se ele
+  falhar; `--simular` é o padrão. Não toca no `http_cache`, de propósito.
+
+### Testes
+- **116 → 135**. A guarda usa o texto **exato** que chegou ao canal — é evidência, não
+  vetor inventado — e foi calibrada reintroduzindo o defeito de produção: 5 guardas
+  acusam, incluindo a central. Controle negativo incluído: notícia que *fala* de erro de
+  servidor ("Patch corrige erro 500 no matchmaking") tem de passar, senão o detector
+  recusaria tudo e o bot nunca traduziria nada.
+
+---
+
 ## [2.3.0] - 2026-08-29 — Auditoria de segurança/engenharia + catálogo v3.1
 
 Relatório com evidência colada: `analises/2026-08-29_auditoria-seguranca-engenharia-fontes.md`.
