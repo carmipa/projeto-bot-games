@@ -185,15 +185,20 @@ def test_integration_run_scan_once_with_empty_config(sem_rede):
 @_skip_no_discord
 def test_integration_scan_nao_escreve_em_producao(sem_rede):
     """
-    Trava de regressão: os arquivos de dados resolvidos durante os testes têm de viver no
-    DATA_DIR temporário, nunca na raiz do projeto. Se alguém remover o isolamento do
-    conftest, este teste denuncia — em vez de o estrago só aparecer no bot em produção.
+    Trava de regressão: todo arquivo que o bot ESCREVE tem de resolver dentro do DATA_DIR
+    temporário durante os testes, nunca na raiz do projeto. Se alguém remover o isolamento
+    do conftest, este teste denuncia — em vez de o estrago só aparecer no bot em produção.
+
+    `sources.json` ficou de fora desta lista de propósito: ele deixou de ser dado de
+    execução e passou a ser catálogo versionado, lido do diretório da aplicação (ver
+    `_DATA_FILES` em utils/storage.py). Enquanto resolvia por DATA_DIR, o entrypoint do
+    Docker o copiava para o volume só na primeira subida e congelava o catálogo lá.
     """
     from utils.storage import p
 
     data_dir = os.environ.get("DATA_DIR", "")
     assert data_dir, "DATA_DIR não definido: isolamento do conftest não está ativo"
-    for nome in ("config.json", "state.json", "history.json", "sources.json"):
+    for nome in ("config.json", "state.json", "history.json"):
         resolvido = os.path.abspath(p(nome))
         assert resolvido.startswith(os.path.abspath(data_dir)), (
             f"{nome} resolveu para {resolvido}, fora do DATA_DIR de testes"
@@ -201,6 +206,49 @@ def test_integration_scan_nao_escreve_em_producao(sem_rede):
         assert resolvido != os.path.join(ROOT, nome), (
             f"{nome} resolveu para o arquivo de produção"
         )
+
+
+@_skip_no_discord
+def test_sources_json_e_catalogo_somente_leitura(sem_rede):
+    """
+    `sources.json` resolve para o diretório da aplicação — é isso que faz uma fonte nova
+    commitada chegar ao contêiner. A contrapartida é que o bot NUNCA pode escrevê-lo: se
+    escrevesse, estaria a mexer no arquivo versionado do repositório.
+
+    O teste prova as duas metades. A segunda usa um caso-controle: primeiro confirma que a
+    sonda de escrita SABE disparar (gravando config.json, que o bot legitimamente escreve),
+    e só então afirma que nada tocou em sources.json. Sem o controle positivo, "ninguém
+    escreveu" seria indistinguível de "a sonda não enxerga escrita nenhuma".
+    """
+    import utils.storage as storage
+
+    resolvido = os.path.abspath(storage.p("sources.json"))
+    assert resolvido == os.path.join(ROOT, "sources.json"), (
+        f"sources.json resolveu para {resolvido}; deveria vir do diretório da aplicação"
+    )
+
+    escritos = []
+    original = storage.save_json_safe
+
+    def _espiao(filepath, data):
+        escritos.append(os.path.abspath(filepath))
+        return original(filepath, data)
+
+    storage.save_json_safe = _espiao
+    try:
+        # Controle positivo: a sonda tem de registar uma escrita legítima.
+        storage.save_json_safe(storage.p("config.json"), {})
+        assert escritos, "sonda de escrita não registou nem a escrita de controle"
+
+        escritos.clear()
+        from core.scanner import load_sources
+        load_sources()
+    finally:
+        storage.save_json_safe = original
+
+    assert resolvido not in escritos, (
+        f"sources.json foi escrito durante a leitura do catálogo: {escritos}"
+    )
 
 
 @_skip_no_discord

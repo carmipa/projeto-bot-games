@@ -1,28 +1,15 @@
 """
 Cache utilities - HTTP caching with ETag and Last-Modified support.
+
+O cache HTTP vive dentro de `state["http_cache"]`, NÃO na raiz do `state.json`. As funções
+`load_http_state()`/`save_http_state()` que existiam aqui tratavam o `state.json` inteiro
+como se fosse o mapa de ETags: `save_http_state()` gravava o dicionário de cache por cima
+do ficheiro todo e apagaria `dedup`, `html_hashes` e `last_announced_hash` — repostagem em
+massa de tudo o que o bot já publicou. Não eram chamadas em lado nenhum (a varredura usa
+`state["http_cache"]` diretamente), e foram removidas em vez de documentadas: caminho
+errado que continua disponível e parece certo acaba por ser usado.
 """
 from typing import Dict, Any
-from .storage import load_json_safe, save_json_safe, p
-
-
-def load_http_state() -> Dict[str, Dict[str, str]]:
-    """
-    Carrega state.json com ETags e Last-Modified por URL.
-    
-    Returns:
-        Dict com formato: {"https://feed.com": {"etag": "abc123", "last_modified": "..."}}
-    """
-    return load_json_safe(p("state.json"), {})
-
-
-def save_http_state(state: Dict[str, Dict[str, str]]) -> None:
-    """
-    Salva cache de ETags e Last-Modified.
-    
-    Args:
-        state: Dicionário de estados HTTP por URL
-    """
-    save_json_safe(p("state.json"), state)
 
 
 def get_cache_headers(url: str, state: Dict[str, Dict[str, str]]) -> Dict[str, str]:

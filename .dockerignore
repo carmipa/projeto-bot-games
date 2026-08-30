@@ -37,9 +37,12 @@ desktop.ini
 logs/
 
 # Dados que serão volumes (não precisa no build)
+# sources.json NÃO entra aqui: é catálogo versionado e PRECISA ir na imagem (utils/storage.py).
 config.json
 history.json
 state.json
+data/
+backups/
 
 # Assets/relatórios só de documentação (não usados em runtime)
 icon.png

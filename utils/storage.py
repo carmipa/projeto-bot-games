@@ -12,7 +12,15 @@ log = logging.getLogger("GameBot")
 
 
 # Só estes arquivos vão para DATA_DIR no Docker; o resto (translations/, web/, etc.) fica no app.
-_DATA_FILES = ("config.json", "state.json", "history.json", "sources.json")
+#
+# `sources.json` NÃO está aqui, e isso é deliberado. Ele é CATÁLOGO VERSIONADO, não estado
+# de execução: config/state/history nascem vazios e são escritos pelo bot, enquanto o
+# sources.json é escrito por quem edita o repositório. Enquanto ele resolvia por DATA_DIR,
+# o entrypoint copiava-o para o volume apenas na PRIMEIRA subida — e a partir daí toda
+# fonte acrescentada ao repositório era ignorada pelo contêiner, em silêncio: rebuild,
+# redeploy, e o bot continuava a ler o catálogo antigo de `./data/sources.json`.
+# Para usar um catálogo próprio em Docker, monte-o por cima: `- ./meu-sources.json:/app/sources.json:ro`.
+_DATA_FILES = ("config.json", "state.json", "history.json")
 
 
 def _base_dir() -> str:
