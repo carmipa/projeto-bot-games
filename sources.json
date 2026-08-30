@@ -1,8 +1,100 @@
 {
   "_schema": {
-    "versao": "3.0",
-    "atualizado_em": "2026-08-01",
-    "criterio": "Toda fonte aqui foi sondada pelo caminho real do codigo (fetch + feedparser) antes de entrar: status 200, pelo menos 1 entrada e item mais recente com menos de 180 dias. Fontes com 403/404, zero entradas ou congeladas foram removidas.",
+    "versao": "3.1",
+    "atualizado_em": "2026-08-29",
+    "criterio_saude": "Toda fonte aqui foi sondada pelo caminho real do codigo (fetch + feedparser + resolvedor de handle) antes de entrar: status 200, pelo menos 1 entrada e item mais recente com menos de 180 dias. Para YouTube, o TITULO do canal resolvido tem de bater com o handle pedido — handle ocupado por terceiro devolve 200 com videos e so o titulo denuncia.",
+    "criterio_volume": "A partir da v3.1 a admissao tambem tem orcamento medido, nao estimado: entra fonte com ate ~6 itens/24h SOBREVIVENTES ao LIXO_FILTER. O numero sai de `python scripts/probe_sources.py`, que aplica o mesmo should_skip_by_content da varredura. Acima disso a fonte fica documentada abaixo com o numero, e promove-se movendo uma linha.",
+    "ferramenta": "python scripts/probe_sources.py --catalogo   (reaudita tudo; sai 0/1/2 — 2 = NAO VERIFICOU, que nao e aprovacao)",
+
+    "reauditoria_2026_08_29": {
+      "catalogo_v3_0": "96/96 fontes saudaveis (67 feeds + 29 sites HTML). Nenhuma morreu nas 4 semanas desde 2026-08-01.",
+      "youtube_feed_map": "41/41 pares conferidos contra a resolucao AO VIVO: zero divergencia, e todos os titulos batem com o handle. A correcao das 3 ancoras de 2026-08-01 continua de pe.",
+      "volume_base_medido": "v3.0: 67 feeds, 88 itens em 24h / 649 em 7d pos-filtro = 92,7/dia. Este e o denominador de qualquer adicao.",
+      "volume_v3_1_medido": "92 feeds, 103 em 24h / 823 em 7d = 117,6/dia. A adicao custou +24,9/dia (+27%). Medido, nao estimado.",
+      "coerencia_do_mapa": "53/53 pares conferidos contra a resolucao ao vivo: 0 divergencia, 0 channel_id duplicado, 0 handle sem par, 0 entrada orfa. As tres primeiras viraram guarda executavel em tests/test_catalogo_fontes.py."
+    },
+
+    "acrescentadas_2026_08_29": {
+      "https://news.xbox.com/pt-br/feed/": "primeira parte, pt-BR — 7 itens/7d",
+      "https://meups.com.br/feed/": "PlayStation pt-BR — 20/7d",
+      "https://www.nintendoblast.com.br/feeds/posts/default?alt=rss": "Nintendo pt-BR — 22/7d",
+      "https://www.videogameschronicle.com/feed/": "VGC, furos e anuncios — 8/7d",
+      "https://www.timeextension.com/feeds/latest": "mesma familia de nintendolife/pushsquare, ja no catalogo — 21/7d",
+      "https://xboxera.com/feed/": "cobertura Xbox dedicada — 8/7d",
+      "https://mp1st.com/feed": "patches e lancamentos — 20/7d",
+      "https://www.nintendoworldreport.com/rss/news": "4/7d",
+      "https://www.gamereactor.eu/rss/rss.php?texttype=1": "4/7d",
+      "https://godotengine.org/rss.xml": "motor, acompanha Unreal e Unity que ja estao no catalogo — 3/7d",
+      "https://www.dsogaming.com/feed/": "PC, patches e requisitos — 10/7d",
+      "https://www.hardcoregamer.com/feed/": "2/7d",
+      "https://www.gamingbolt.com/feed": "6/7d (o resto do feed e review/guia, que o LIXO_FILTER ja descarta)",
+      "@EpicGamesStore": "canal 'Epic Games' — a loja faltava no catalogo. 13/7d",
+      "@XboxBR": "primeira parte, pt-BR — 3/7d",
+      "@PlayStationAccess": "canal proprio da Sony — 5/7d",
+      "@GameSpot": "imprensa com forte volume de trailer — 10/7d",
+      "@505Games, @RemedyGames, @11bitstudios, @KojimaProductions, @ArcSystemWorksU, @marveloususa, @XSEEDGames, @tinyBuildGAMES": "publishers ausentes do catalogo; 0 a 4 itens/7d cada — custo de uma requisicao por varredura, e trailer quando sai"
+    },
+
+    "handles_de_youtube_PERIGOSOS_nao_usar": {
+      "_nota": "Todos estes respondem 200 e a maioria devolve videos. Sem conferir o TITULO do canal resolvido, o bot assinaria o canal errado em silencio — foi o defeito de 2026-08-01. Medido em 2026-08-29.",
+      "@nintendo": "resolve para o canal 'koi' (terceiro), 0 videos. O oficial e @NintendoAmerica / @NintendoUK, ja no catalogo",
+      "@PlayStationLatam": "resolve para 'Conejo en Luna' (terceiro), parado ha 1507 dias",
+      "@SNKGLOBAL": "resolve para um canal em sanscrito ('संस्कृत गंगा ग्लोबल') com 15 videos recentes — PASSA no criterio de saude e so o titulo denuncia",
+      "@ObsidianEntertainment": "resolve para 'Isaac Watts' (terceiro), 0 videos",
+      "@PlayStationEurope": "resolve para o MESMO channel_id de @PlayStation (UC-2Y8dQb0S6DtpxNgAKoJKA) — duplicata, causaria post em dobro",
+      "@gamescom": "resolve para 'YouTube Live at gamescom', ultimo video ha 3545 dias",
+      "handles_404": "@SummerGameFest, @summergamefest, @gamescom_official, @EpicGames, @XboxBrasil, @tinyBuild, @Obsidian, @SNKPOfficial, @NetEaseGamesGlobal, @teamninja_studio, @TeamNINJAOfficial, @AksysGames, @AksysGamesLocalization, @SEGAAmerica, @FocusEntmt, @NintendoJPofficial",
+      "resolvem_mas_feed_vazio": "@NetEaseGames (UCmFNUlfyBs8wXD0anbY3D8A), @DeepSilver (UCzkYTERQXM0WM_5Ha1yBzHQ) — titulo correto, 0 entradas no Atom"
+    },
+
+    "validos_mas_silenciosos_reavaliar_quando_publicarem": {
+      "_nota": "Canais legitimos, channel_id conferido, titulo bate. Reprovam so pelo criterio dos 180 dias. Publisher entre lancamentos fica calado — nao e o mesmo que morto. Promover movendo para youtube_feeds + youtube_feed_map.",
+      "https://www.youtube.com/@larianstudios": "UCQ-AAXSt0M5Gx0-A9UGut8g — ultimo video ha 257 dias",
+      "https://www.youtube.com/@FocusEntertainment": "UCfQLYgOVWNGBi0QIh0h3NyA — 277 dias",
+      "https://www.youtube.com/@HoYoverse": "UCPbogzM__JiYQmU3uOQ-BOw — 905 dias",
+      "https://www.youtube.com/@SquareEnix": "UC6SmH9mR82nj28_NNg_rZvA — canal japones, ativo (0 dias), mas os titulos em japones quase nunca passam no STRICT_GENERIC_YOUTUBE. Ligar so se STRICT_GENERIC_YOUTUBE=0"
+    },
+
+    "nao_adicionadas_por_volume": {
+      "_nota": "Todas passaram na sondagem de saude em 2026-08-29. Ficam de fora pelo orcamento, com o numero medido pos-LIXO_FILTER. Mover para rss_feeds e uma linha.",
+      "https://www.pcgamer.com/rss/": "13 itens/24h",
+      "https://www.gamesradar.com/rss/": "17/24h",
+      "https://www.pcgamesn.com/mainrss.xml": "10/24h",
+      "https://www.destructoid.com/feed/": "7/24h",
+      "https://kotaku.com/rss": "11/24h",
+      "https://www.gamingonlinux.com/article_rss.php": "5/24h",
+      "https://feeds.feedburner.com/ign/games-all": "7/24h",
+      "https://br.ign.com/feed.xml": "12/24h — pt-BR, a de maior valor da lista se quiser mais cobertura em portugues",
+      "https://www.adrenaline.com.br/games/feed/": "11/24h (o /feed/ geral mistura hardware)",
+      "https://www.gamevicio.com/rss/": "10/24h — o feed so guarda 10 itens e todos tinham menos de 24h, entao o ritmo real e maior",
+      "https://nintendoeverything.com/feed/": "8/24h",
+      "https://www.rpgsite.net/feed": "9/24h",
+      "https://www.4gamer.net/rss/index.xml": "29/24h, em japones",
+      "nota_soma": "As 7 primeiras somavam '~45/dia' em 2026-08-01; medidas de novo hoje somam ~70/dia. A estimativa antiga estava conservadora."
+    },
+
+    "nao_adicionadas_por_escopo": {
+      "https://80.lv/feed/": "arte e pipeline de desenvolvimento; o bot e de trailer e anuncio. 4/24h",
+      "https://blog.unity.com/feed": "corporativo — 50 entradas, item mais recente ha 11 dias, ZERO sobreviventes ao LIXO_FILTER",
+      "https://itch.io/blog.rss": "526 entradas por download, item mais recente ha 29 dias, zero sobreviventes",
+      "https://blog.humblebundle.com/rss": "promocoes e bundles, nao noticia de jogo (e devolveu 403 na segunda sondagem)",
+      "@eurogamer, @DigitalFoundry, @gameinformer, @PCGamer, @NoisyPixelNews": "canais de imprensa cujo conteudo e sobretudo review/podcast/analise tecnica — 0 a 2 sobreviventes em 7 dias. Custam requisicao e rendem quase nada"
+    },
+
+    "reprovadas_2026_08_29_com_motivo": {
+      "https://www.theenemy.com.br/rss": "TLS invalido: 'certificate is not valid for www.theenemy.com.br' (hostname mismatch). Defeito do certificado deles. O bot verifica com certifi e isso NAO deve ser desligado para acomodar uma fonte",
+      "https://rss.uol.com.br/feed/jogos.xml": "200 com 15 entradas e NENHUMA data. Com REQUIRE_ENTRY_DATE=1 o bot descartaria todas — a fonte pareceria saudavel e nunca postaria nada",
+      "https://www.playstationblast.com.br/feeds/posts/default?alt=rss": "200 com 25 entradas, item mais recente ha 2696 dias",
+      "https://toucharcade.com/feed/": "200 com 100 entradas, item mais recente ha 497 dias",
+      "https://www.pcinvasion.com/feed/": "200 com 6 entradas, item mais recente ha 478 dias",
+      "https://canaltech.com.br/rss/games/": "200 com 50 entradas, mas item mais recente ha 48 dias — secao parada",
+      "https://www.tecmundo.com.br/rss e /rss/voxel": "timeout e 200 sem entradas",
+      "https://www.xboxblast.com.br/...": "404",
+      "https://www.famitsu.com/rss/fcom_all.rdf": "404",
+      "https://noisypixel.net/feed/ e https://www.indiedb.com/news/feed/rss.xml": "403",
+      "https://blog.pt.playstation.com/feed/": "dominio nao resolve"
+    },
+
     "removidas_2026_08_01": {
       "https://www.vg247.com/feed": "congelado - item mais recente com 60 dias (o /feed/news tambem)",
       "https://www.eurogamer.pt/feed/videos": "congelado - item mais recente com 917 dias",
@@ -12,23 +104,14 @@
       "@EA": "handle ocupado por terceiro ('Albania', 0 videos) - trocado por @ElectronicArts",
       "@2K": "handle ocupado por terceiro ('cloner') - trocado por @2KGames",
       "https://www.sega.com/ e https://www.devolverdigital.com/": "bloqueio de bot recorrente no HTML Monitor (falha em toda varredura)",
-      "https://primagames.com/news/feed e https://www.siliconera.com/feed/": "BLOQUEIO DE IP, nao fonte morta: 200 de IP residencial, 403 do IP da VPS em 4 User-Agents x 7 caminhos. Vivas, mas inalcancaveis do servidor onde o bot roda. Reavaliar se o bot mudar de IP ou ganhar proxy."
-    },
-    "nao_adicionadas_por_volume": [
-      "https://www.pcgamer.com/rss/",
-      "https://www.gamesradar.com/rss/",
-      "https://www.pcgamesn.com/mainrss.xml",
-      "https://www.destructoid.com/feed/",
-      "https://kotaku.com/rss",
-      "https://www.gamingonlinux.com/article_rss.php",
-      "https://feeds.feedburner.com/ign/games-all"
-    ],
-    "nota_volume": "As 7 acima passaram na sondagem mas somam ~45 posts/dia extra depois do LIXO_FILTER. Ficaram de fora para nao inundar o canal; basta mover para rss_feeds se quiser mais cobertura."
+      "https://primagames.com/news/feed e https://www.siliconera.com/feed/": "BLOQUEIO DE IP, nao fonte morta: 200 de IP residencial, 403 do IP da VPS em 4 User-Agents x 7 caminhos. Vivas, mas inalcancaveis do servidor onde o bot roda. RECONFIRMADO em 2026-08-29: as duas respondem 200 com conteudo de hoje a partir do desktop (DESKTOP-QDNQHL1, IP residencial). Continuam FORA porque o veredito que importa e o do IP onde o bot roda; reavaliar se o bot mudar de IP ou ganhar proxy."
+    }
   },
 
   "rss_feeds": [
     "https://blog.playstation.com/feed/",
     "https://news.xbox.com/en-us/feed/",
+    "https://news.xbox.com/pt-br/feed/",
     "https://store.steampowered.com/feeds/news.xml",
 
     "https://www.rockpapershotgun.com/feed",
@@ -36,10 +119,16 @@
     "https://www.gamesindustry.biz/rss/gamesindustry_news_feed.rss",
     "https://www.gameinformer.com/news.xml",
     "https://www.videogamer.com/feed/",
+    "https://www.videogameschronicle.com/feed/",
     "https://pocketgamer.com/news/index.rss",
     "https://www.polygon.com/rss/index.xml",
     "https://www.theverge.com/rss/games/index.xml",
     "https://insider-gaming.com/feed/",
+    "https://mp1st.com/feed",
+    "https://www.dsogaming.com/feed/",
+    "https://www.gamingbolt.com/feed",
+    "https://www.hardcoregamer.com/feed/",
+    "https://www.gamereactor.eu/rss/rss.php?texttype=1",
 
     "https://www.eurogamer.pt/feed/news",
     "https://www.eurogamer.net/?format=rss",
@@ -47,6 +136,12 @@
     "https://www.nintendolife.com/feeds/latest",
     "https://www.pushsquare.com/feeds/latest",
     "https://www.purexbox.com/feeds/latest",
+    "https://www.timeextension.com/feeds/latest",
+    "https://www.nintendoworldreport.com/rss/news",
+    "https://xboxera.com/feed/",
+
+    "https://meups.com.br/feed/",
+    "https://www.nintendoblast.com.br/feeds/posts/default?alt=rss",
 
     "https://www.gematsu.com/feed",
     "https://automaton-media.com/en/feed/",
@@ -54,7 +149,8 @@
     "https://www.gamedeveloper.com/rss.xml",
     "https://indiegamesplus.com/feed",
     "https://www.escapistmagazine.com/v2/feed/",
-    "https://www.unrealengine.com/rss"
+    "https://www.unrealengine.com/rss",
+    "https://godotengine.org/rss.xml"
   ],
 
   "youtube_feeds": [
@@ -62,13 +158,17 @@
     "https://www.youtube.com/@IGN",
     "https://www.youtube.com/@IGNBrasil",
     "https://www.youtube.com/@IndieHub01",
+    "https://www.youtube.com/@GameSpot",
 
     "https://www.youtube.com/@PlayStation",
     "https://www.youtube.com/@PlayStationBR",
+    "https://www.youtube.com/@PlayStationAccess",
     "https://www.youtube.com/@Xbox",
+    "https://www.youtube.com/@XboxBR",
     "https://www.youtube.com/@NintendoAmerica",
     "https://www.youtube.com/@NintendoUK",
     "https://www.youtube.com/@Steam",
+    "https://www.youtube.com/@EpicGamesStore",
 
     "https://www.youtube.com/@UnrealEngine",
     "https://www.youtube.com/@unity",
@@ -90,6 +190,10 @@
     "https://www.youtube.com/@ParadoxInteractive",
     "https://www.youtube.com/@AnnapurnaInteractive",
     "https://www.youtube.com/@THQNordic",
+    "https://www.youtube.com/@505Games",
+    "https://www.youtube.com/@RemedyGames",
+    "https://www.youtube.com/@11bitstudios",
+    "https://www.youtube.com/@tinyBuildGAMES",
     "https://www.youtube.com/feeds/videos.xml?channel_id=UCaLdl0827np4QVPESo794og",
 
     "https://www.youtube.com/@bandainamcoentertainment",
@@ -102,6 +206,10 @@
     "https://www.youtube.com/@KONAMI",
     "https://www.youtube.com/@KoeiTecmoAmerica",
     "https://www.youtube.com/@NISAmerica",
+    "https://www.youtube.com/@KojimaProductions",
+    "https://www.youtube.com/@ArcSystemWorksU",
+    "https://www.youtube.com/@marveloususa",
+    "https://www.youtube.com/@XSEEDGames",
 
     "https://www.youtube.com/feeds/videos.xml?channel_id=UCHo_GVNoKNqfJx6zUGRd6YQ",
     "https://www.youtube.com/@TokyoGameShow",
@@ -115,12 +223,16 @@
     "https://www.youtube.com/@IGN": "https://www.youtube.com/feeds/videos.xml?channel_id=UCKy1dAqELo0zrOtPkf0eTMw",
     "https://www.youtube.com/@IGNBrasil": "https://www.youtube.com/feeds/videos.xml?channel_id=UCfg4PAgKIurlvYJRhhukv_g",
     "https://www.youtube.com/@IndieHub01": "https://www.youtube.com/feeds/videos.xml?channel_id=UCt8CJiye87FMbEwt0npPMuQ",
+    "https://www.youtube.com/@GameSpot": "https://www.youtube.com/feeds/videos.xml?channel_id=UCbu2SsF-Or3Rsn3NxqODImw",
     "https://www.youtube.com/@PlayStation": "https://www.youtube.com/feeds/videos.xml?channel_id=UC-2Y8dQb0S6DtpxNgAKoJKA",
     "https://www.youtube.com/@PlayStationBR": "https://www.youtube.com/feeds/videos.xml?channel_id=UC6i4mzH3OPrZV0p64zoz-Ww",
+    "https://www.youtube.com/@PlayStationAccess": "https://www.youtube.com/feeds/videos.xml?channel_id=UC6yzV_xgKn8r77FkcmZyMSg",
     "https://www.youtube.com/@Xbox": "https://www.youtube.com/feeds/videos.xml?channel_id=UCjBp_7RuDBUYbd1LegWEJ8g",
+    "https://www.youtube.com/@XboxBR": "https://www.youtube.com/feeds/videos.xml?channel_id=UCi9Uzh14BHqkN7UO_2lbrMw",
     "https://www.youtube.com/@NintendoAmerica": "https://www.youtube.com/feeds/videos.xml?channel_id=UCGIY_O-8vW4rfX98KlMkvRg",
     "https://www.youtube.com/@NintendoUK": "https://www.youtube.com/feeds/videos.xml?channel_id=UCEG4fd9DERXPzziMo3WgYMA",
     "https://www.youtube.com/@Steam": "https://www.youtube.com/feeds/videos.xml?channel_id=UChmZ6QbxgHlmX3ISIHxIpQQ",
+    "https://www.youtube.com/@EpicGamesStore": "https://www.youtube.com/feeds/videos.xml?channel_id=UC5Qk8mWBwtMyEj7iQQYRk1A",
     "https://www.youtube.com/@UnrealEngine": "https://www.youtube.com/feeds/videos.xml?channel_id=UCBobmJyzsJ6Ll7UbfhI4iwQ",
     "https://www.youtube.com/@unity": "https://www.youtube.com/feeds/videos.xml?channel_id=UCG08EqOAXJk_YXPDsAvReSg",
     "https://www.youtube.com/@ElectronicArts": "https://www.youtube.com/feeds/videos.xml?channel_id=UCIHBybdoneVVpaQK7xMz1ww",
@@ -140,6 +252,10 @@
     "https://www.youtube.com/@ParadoxInteractive": "https://www.youtube.com/feeds/videos.xml?channel_id=UC1JOnWZrVWKzX3UMdpnvuMg",
     "https://www.youtube.com/@AnnapurnaInteractive": "https://www.youtube.com/feeds/videos.xml?channel_id=UCoztP3NSW03Kd69KjQEIxeg",
     "https://www.youtube.com/@THQNordic": "https://www.youtube.com/feeds/videos.xml?channel_id=UCpUu6hoAK8axMVZ2c_jgMCQ",
+    "https://www.youtube.com/@505Games": "https://www.youtube.com/feeds/videos.xml?channel_id=UCeO7Obz1NdrZYhI4PtstNuA",
+    "https://www.youtube.com/@RemedyGames": "https://www.youtube.com/feeds/videos.xml?channel_id=UCS6s3OidfTU0fMRScTGE_jg",
+    "https://www.youtube.com/@11bitstudios": "https://www.youtube.com/feeds/videos.xml?channel_id=UCq2-YS92kRURomhlw2fj7_g",
+    "https://www.youtube.com/@tinyBuildGAMES": "https://www.youtube.com/feeds/videos.xml?channel_id=UCHLuN_JL66bD8fdJWmQ-gNw",
     "https://www.youtube.com/@bandainamcoentertainment": "https://www.youtube.com/feeds/videos.xml?channel_id=UCqly9F4Fr_jf2Y1Cy5hacRg",
     "https://www.youtube.com/@BandaiNamcoAmerica": "https://www.youtube.com/feeds/videos.xml?channel_id=UC_ntXHv-XdKCD7CPynVvnQw",
     "https://www.youtube.com/@SquareEnixNA": "https://www.youtube.com/feeds/videos.xml?channel_id=UCA5SLTAVA6unn1M-6lbo1NA",
@@ -149,6 +265,10 @@
     "https://www.youtube.com/@KONAMI": "https://www.youtube.com/feeds/videos.xml?channel_id=UCwkUBN7foWU9GcY5cFmso-Q",
     "https://www.youtube.com/@KoeiTecmoAmerica": "https://www.youtube.com/feeds/videos.xml?channel_id=UCvGWdOpqf44AChMzqV9Ja5Q",
     "https://www.youtube.com/@NISAmerica": "https://www.youtube.com/feeds/videos.xml?channel_id=UC23CkkRDleBbvcwu_CcB3rA",
+    "https://www.youtube.com/@KojimaProductions": "https://www.youtube.com/feeds/videos.xml?channel_id=UC6lUqvh42Oc3XL19Edgd9QA",
+    "https://www.youtube.com/@ArcSystemWorksU": "https://www.youtube.com/feeds/videos.xml?channel_id=UCBz_Fm199gY2XBj25TxzReA",
+    "https://www.youtube.com/@marveloususa": "https://www.youtube.com/feeds/videos.xml?channel_id=UC7_wB0cOhO2EwVbViZyfmDA",
+    "https://www.youtube.com/@XSEEDGames": "https://www.youtube.com/feeds/videos.xml?channel_id=UC4jtViMLgZ1GY-_jCmImWIg",
     "https://www.youtube.com/@TokyoGameShow": "https://www.youtube.com/feeds/videos.xml?channel_id=UClFyIegrk4g6CFqGYCwTViA",
     "https://www.youtube.com/@thegameawards": "https://www.youtube.com/feeds/videos.xml?channel_id=UCqDS7KWjAPKv-7ZSlro9OiQ",
     "https://www.youtube.com/@MechaBREAK": "https://www.youtube.com/feeds/videos.xml?channel_id=UCKfB7ETv-pCdtHs3TVbHiFQ"
