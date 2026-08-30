@@ -4,6 +4,86 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 
 ---
 
+## [2.3.0] - 2026-08-29 — Auditoria de segurança/engenharia + catálogo v3.1
+
+Relatório com evidência colada: `analises/2026-08-29_auditoria-seguranca-engenharia-fontes.md`.
+
+### Crítico
+- **Falha do dashboard web abortava o `on_ready` inteiro.** `on_ready` é handler de evento:
+  a exceção era engolida pelo discord.py e **tudo o que vinha depois** — sync de comandos,
+  agendador, anúncio de versão — deixava de rodar. Bastava a porta 8080 ocupada para o bot
+  ficar online, responder `/ping` e **nunca varrer**, sem log que ligasse causa e efeito.
+  Agora `start_web_server_tolerante()` contém a falha; guarda em `tests/test_web_server_tolerante.py`.
+- **Perda permanente de notícia por ETag prematuro.** `update_cache_state()` gravava o
+  ETag logo após o HTTP 200, *antes* de publicar. Falha de entrega (sem permissão no canal,
+  canal apagado, 5xx do Discord) não punha o link no dedup mas gravava o ETag ⇒ a varredura
+  seguinte recebia 304 e aquelas notícias sumiam para sempre. O cache só avança quando o
+  feed inteiro foi processado sem falha de entrega.
+
+### Segurança
+- **DNS bloqueante dentro do event loop.** `validate_url()` chama `socket.getaddrinfo` e era
+  usada de dentro de corrotinas — ~92 feeds + 29 sites por ciclo. Cada resolução lenta
+  segurava o loop inteiro, incluindo o heartbeat do gateway. Criada `validate_url_async()`
+  (usa `loop.getaddrinfo`); as duas partilham a mesma política, sem cópia.
+- **Sanitização de log não cobria formatação preguiçosa.** `SecurityFilter` limpava só o
+  molde: em `log.error("feed %s falhou", url)`, o argumento passava intacto. Passa a
+  sanitizar a mensagem renderizada.
+- **Logger do dashboard não chegava ao arquivo.** Era `getLogger("GameNewsWeb")`, irmão e não
+  filho de `GameBot`: sem handlers e sem `SecurityFilter`. "Token inválido do IP X" — evento
+  de segurança — nunca entrava em `logs/bot.log`. Agora é `GameBot.web`.
+- **CI ganhou varredura de dependências vulneráveis** (`pip-audit`), que era GAP declarado.
+  Reprova em qualquer CVE nova; a única exceção é nominal, datada e justificada
+  (PYSEC-2022-252 do `deep-translator`, sem versão de correção — artefato instalado
+  verificado: wheel pura, sem `setup.py`/`.pth`/`subprocess`/`eval`/`environ`).
+
+### Correção
+- **O passo de lint do CI estava vermelho** e, sendo anterior ao `pytest`, deixava a suíte
+  sem rodar no CI. Causa: `--select=F82` casa por prefixo e captura `F824` (`nonlocal` de
+  nome nunca reatribuído em `core/scanner.py`). Corrigido no código, não afrouxando o filtro.
+- **Docker congelava o `sources.json`.** O entrypoint copiava o catálogo para o volume só na
+  primeira subida; a partir daí toda fonte nova commitada era ignorada pelo contêiner, em
+  silêncio. `sources.json` deixou de ser arquivo de `DATA_DIR` e passou a ser catálogo
+  versionado lido de `/app/sources.json`.
+- **Truncagem silenciosa por `MAX_ENTRIES_PER_FEED`.** Com varredura de 24 h e teto de 10, um
+  feed que publica 14 itens/dia perdia 4 por dia sem uma linha de log. Agora avisa quantas
+  entradas foram descartadas sem análise, com a instrução do que ajustar.
+- `DISCORD_TOKEN` ausente falha no arranque com instrução, em vez de erro cru da biblioteca.
+- Removidas `load_http_state()`/`save_http_state()` de `utils/cache.py`: mortas, e
+  `save_http_state()` gravaria o cache HTTP por cima do `state.json` inteiro, apagando
+  `dedup` e `html_hashes` — repostagem em massa. Removidas em vez de documentadas.
+- Removido `tests/manual_http_probe.py`, que ainda importava `httpx` (dependência retirada
+  em `f977e94`).
+
+### Fontes — catálogo v3.1
+- Nova ferramenta: **`scripts/probe_sources.py`**, que sonda pelo caminho real do bot
+  (mesmo fetch, mesmo `feedparser`, mesmo resolvedor de handle) e **se calibra** com controle
+  positivo e negativo antes de emitir veredito. Três estados de saída: `0` passou, `1`
+  reprovou, `2` **NÃO VERIFICOU** — que não é aprovação.
+- Reauditoria do v3.0: **96/96 saudáveis**; `youtube_feed_map` conferido contra a resolução
+  ao vivo, 41/41 pares corretos.
+- **+25 fontes** (13 RSS, 12 YouTube), todas sondadas e com volume medido. Catálogo agora
+  em **121/121 saudáveis**. Volume pós-filtro: 92,7 → **117,6 itens/dia** (+27%), medido e
+  não estimado.
+- Admissão passou a ter **orçamento medido**: entra fonte com até ~6 itens/24 h sobreviventes
+  ao `LIXO_FILTER`. As de maior volume ficam documentadas **com o número**, e promovê-las é
+  mover uma linha.
+- Registradas no `_schema` as armadilhas medidas: `@nintendo` → canal 'koi' (terceiro),
+  `@PlayStationLatam` → 'Conejo en Luna', `@SNKGLOBAL` → canal em sânscrito que **passa** no
+  critério de saúde, `@PlayStationEurope` → duplicata do `@PlayStation`. Mais 3 feeds com
+  HTTP 200 e conteúdo congelado há 1–7 anos, e o UOL Jogos com 15 entradas e **nenhuma data**
+  (o `REQUIRE_ENTRY_DATE=1` descartaria todas — fonte que parece viva e nunca posta).
+
+### Testes
+- **80 → 116 testes**, todos verdes. Cada correção nasceu com guarda, e **cada guarda foi
+  calibrada reintroduzindo o defeito** — sem exceção.
+- Guardas novas: contenção da falha do dashboard, ETag x falha de entrega (com controle
+  positivo), sanitização de log com argumentos (com controle negativo para não voltar a
+  mascarar `channel_id`), DNS fora da thread do loop, uso da variante assíncrona no código de
+  produção, e coerência estrutural do catálogo (handle sem par, `channel_id` duplicado,
+  entrada órfã, URL repetida).
+
+---
+
 ## [2.2.0] - 2026-07-12 — Auditoria profunda (segurança, bugs, desempenho, testes)
 
 ### Segurança
