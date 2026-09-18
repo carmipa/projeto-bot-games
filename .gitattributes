@@ -1,0 +1,13 @@
+# Normalizacao de fim de linha. Ver o commit equivalente do anime-news e do
+# gundam: working tree em CRLF vs HEAD em LF, resquicio da migracao G:->F:
+# (2026-09-14). Sem impacto em producao (Dockerfile CMD exec form, nenhum .sh
+# rastreado), mas afogava qualquer diff real. eol=lf explicito de proposito.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.mp4 binary
