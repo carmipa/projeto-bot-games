@@ -156,6 +156,34 @@ def validate_url(url: str, allowed_domains: Optional[List[str]] = None) -> Tuple
     return _veredito_dns(host, enderecos, falha)
 
 
+def imagem_publicavel(url: Optional[str]) -> Optional[str]:
+    """
+    PROPOSITO DE NEGOCIO: impedir que uma imagem ruim APAGUE a noticia. O Discord
+    recusa o embed inteiro com 400 (error code 50035) quando a URL de imagem e
+    malformada; a noticia falha em todas as guilds, nao entra no dedup e o ciclo
+    seguinte tenta de novo -- para sempre. Guarda aplicada a TODA imagem do FEED
+    antes do set_image/set_thumbnail (o og:image ja passa por validate_url_async;
+    o caminho do feed estava descoberto -- medido 2026-09-18, portado dos irmaos).
+
+    INVARIANTES DO DOMINIO: usa a parte ESTRUTURAL da validacao (_validar_estrutura)
+    -- esquema http(s), host presente, dominio local recusado, sem caracteres de
+    controle. NAO faz DNS: e chamada dentro do event loop (build_embed e corrotina),
+    e getaddrinfo bloquearia o heartbeat do gateway. A imagem e buscada pelo
+    Discord, nao pelo bot, entao validar FORMATO basta para o 50035; o SSRF do
+    fetch ja e coberto por validate_url_async no caminho do og:image.
+
+    COMPORTAMENTO EM CASO DE FALHA: devolve None (noticia sai sem imagem, desfecho
+    seguro); nunca levanta.
+    """
+    if not url or not isinstance(url, str):
+        return None
+    limpa = url.strip()
+    ok, _erro, _host = _validar_estrutura(limpa, None)
+    if not ok:
+        return None
+    return limpa
+
+
 async def validate_url_async(url: str, allowed_domains: Optional[List[str]] = None) -> Tuple[bool, Optional[str]]:
     """
     PROPÓSITO DE NEGÓCIO: a mesma validação anti-SSRF de `validate_url`, para uso dentro

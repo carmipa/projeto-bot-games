@@ -45,7 +45,7 @@ from utils.storage import p, load_json_safe, save_json_safe
 from utils.html import clean_html
 from utils.cache import get_cache_headers, update_cache_state
 from utils.translator import translate_to_target, t
-from utils.security import validate_url_async, sanitize_log_message
+from utils.security import validate_url_async, sanitize_log_message, imagem_publicavel
 from utils.http import get_robust_headers
 from core.stats import stats
 from core import telemetria
@@ -617,13 +617,30 @@ def build_news_message(
         footer_text = f"{footer_text} • {t.get('embed.published_at', lang=target_lang, date=date_str)}"
     embed.set_footer(text=footer_text)
 
-    if entry_image_url:
-        embed.set_image(url=entry_image_url)
+    # Guarda: URL de imagem malformada faz o Discord recusar o EMBED INTEIRO
+    # (50035) -- noticia falha em todas as guilds, nao entra no dedup e o ciclo
+    # repete para sempre. O og:image ja passa por validate_url_async; esta guarda
+    # fecha o caminho do FEED (entry_image_url do feed e media_thumbnail direto),
+    # que ia ao embed sem validacao. Noticia sem imagem e lida; recusada nao existe.
+    img_ok = imagem_publicavel(entry_image_url)
+    if entry_image_url and not img_ok:
+        log.warning(
+            "[EMBED] Imagem descartada por URL invalida, noticia segue sem ela: %s",
+            str(entry_image_url)[:120],
+        )
+    if img_ok:
+        embed.set_image(url=img_ok)
     elif hasattr(entry, "media_thumbnail") and entry.media_thumbnail:
         try:
             thumb_url = entry.media_thumbnail[0].get("url")
-            if thumb_url:
-                embed.set_thumbnail(url=thumb_url)
+            thumb_ok = imagem_publicavel(thumb_url)
+            if thumb_url and not thumb_ok:
+                log.warning(
+                    "[EMBED] Thumbnail descartada por URL invalida, noticia segue sem ela: %s",
+                    str(thumb_url)[:120],
+                )
+            if thumb_ok:
+                embed.set_thumbnail(url=thumb_ok)
         except (IndexError, AttributeError, KeyError) as e:
             log.debug(f"Erro ao obter thumbnail da entrada: {e}")
         except Exception as e:
