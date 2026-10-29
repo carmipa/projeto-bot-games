@@ -159,3 +159,56 @@ def test_detector_aceita_o_que_tem_de_aceitar(bom):
     a assinatura procurada é o texto da página do Google, não a palavra "erro".
     """
     assert tr._traducao_utilizavel(bom) is True
+
+
+# --------------------------------------------------------------------------
+# Serviço que não responde: requests.get do deep_translator não tem timeout
+# --------------------------------------------------------------------------
+
+class _TradutorMudo:
+    def translate(self, texto):
+        import time as _t
+        _t.sleep(0.6)
+        return "tarde demais"
+
+
+def test_servico_mudo_publica_o_original_no_prazo(monkeypatch):
+    """Sem prazo, uma conexão parada prendia a varredura inteira."""
+    import time as _t
+    monkeypatch.setattr(tr, "_get_translator", lambda alvo: _TradutorMudo())
+    monkeypatch.setattr(tr, "_TRADUCAO_TIMEOUT_S", 0.05)
+
+    async def medir():
+        # Medido DENTRO do loop: o asyncio.run espera a thread presa ao encerrar, coisa que o
+        # loop do bot, que nunca encerra, não faz.
+        inicio = _t.perf_counter()
+        saida = await tr.translate_to_target(ORIGINAL, "pt_BR")
+        return saida, _t.perf_counter() - inicio
+
+    saida, decorrido = asyncio.run(medir())
+    assert saida == ORIGINAL
+    assert decorrido < 0.5
+    assert tr.degradacoes_totais() == 1
+    assert ("pt", ORIGINAL) not in tr._translation_cache
+
+
+def test_gemeo_servico_rapido_nao_e_cortado(monkeypatch):
+    _com_tradutor_que_responde(monkeypatch, "Na próxima semana no Xbox")
+    monkeypatch.setattr(tr, "_TRADUCAO_TIMEOUT_S", 5.0)
+    assert asyncio.run(tr.translate_to_target(ORIGINAL, "pt_BR")) == "Na próxima semana no Xbox"
+    assert tr.degradacoes_totais() == 0
+
+
+def test_traducao_roda_no_executor_do_tradutor(monkeypatch):
+    """Thread presa no tradutor não pode tomar vaga do executor padrão (feeds, DNS, Discord)."""
+    import threading
+    nomes = []
+
+    class _Registra:
+        def translate(self, texto):
+            nomes.append(threading.current_thread().name)
+            return "Na próxima semana no Xbox"
+
+    monkeypatch.setattr(tr, "_get_translator", lambda alvo: _Registra())
+    assert asyncio.run(tr.translate_to_target(ORIGINAL, "pt_BR")) == "Na próxima semana no Xbox"
+    assert nomes and nomes[0].startswith("tradutor"), nomes

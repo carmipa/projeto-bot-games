@@ -5,6 +5,7 @@ import time
 import logging
 import asyncio
 from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, Any, Optional
 from deep_translator import GoogleTranslator
 
@@ -156,6 +157,15 @@ _ASSINATURAS_DE_PAGINA_DE_ERRO = (
 # tentar por uns minutos.
 _FALHAS_ATE_DEGRADAR = 5
 _DEGRADACAO_SEGUNDOS = 600
+# O deep_translator chama requests.get SEM timeout: uma conexão que para de responder
+# prenderia a varredura inteira. Passado o prazo publica-se o original e a falha conta para
+# o disjuntor.
+_TRADUCAO_TIMEOUT_S = 15.0
+# A thread de um pedido assim pode ficar presa para sempre (o urllib3 não liga keepalive).
+# Por isso o tradutor tem executor PRÓPRIO: preso, ele só esgota a tradução, que já cai no
+# prazo e no disjuntor. No executor padrão as presas acabariam com as vagas do feedparser,
+# do HTML Monitor e do DNS do aiohttp (inclusive o do Discord).
+_executor_traducao = ThreadPoolExecutor(max_workers=2, thread_name_prefix="tradutor")
 _falhas_consecutivas = 0
 _degradado_ate = 0.0
 # Cumulativo desde o arranque. A telemetria de ausencia le a diferenca entre varreduras
@@ -226,8 +236,9 @@ async def translate_to_target(text: str, target_lang: str) -> str:
 
     COMPORTAMENTO EM CASO DE FALHA: devolve o `text` recebido, e regista em WARNING (não
     em debug: publicar sem tradução é degradação visível e tem de aparecer no log). Nunca
-    levanta. Depois de `_FALHAS_ATE_DEGRADAR` falhas seguidas abre um disjuntor de
-    `_DEGRADACAO_SEGUNDOS`, durante o qual devolve o original sem sequer chamar o serviço.
+    levanta. Serviço sem resposta em `_TRADUCAO_TIMEOUT_S` conta como falha. Depois de
+    `_FALHAS_ATE_DEGRADAR` falhas seguidas abre um disjuntor de `_DEGRADACAO_SEGUNDOS`,
+    durante o qual devolve o original sem sequer chamar o serviço.
     """
     if not text:
         return ""
@@ -261,7 +272,17 @@ async def translate_to_target(text: str, target_lang: str) -> str:
     try:
         loop = asyncio.get_running_loop()
         translator = _get_translator(target)
-        trad = await loop.run_in_executor(None, translator.translate, text)
+        trad = await asyncio.wait_for(
+            loop.run_in_executor(_executor_traducao, translator.translate, text),
+            timeout=_TRADUCAO_TIMEOUT_S,
+        )
+    except asyncio.TimeoutError:
+        log.warning(
+            "🌐 Tradução falhou (sem resposta do serviço em %ss). Publicando o texto original.",
+            f"{_TRADUCAO_TIMEOUT_S:g}",
+        )
+        _registrar_falha()
+        return text
     except Exception as e:
         log.warning(
             "🌐 Tradução falhou (%s: %s). Publicando o texto original.",
