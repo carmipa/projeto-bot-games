@@ -105,6 +105,11 @@
       "@2K": "handle ocupado por terceiro ('cloner') - trocado por @2KGames",
       "https://www.sega.com/ e https://www.devolverdigital.com/": "bloqueio de bot recorrente no HTML Monitor (falha em toda varredura)",
       "https://primagames.com/news/feed e https://www.siliconera.com/feed/": "BLOQUEIO DE IP, nao fonte morta: 200 de IP residencial, 403 do IP da VPS em 4 User-Agents x 7 caminhos. Vivas, mas inalcancaveis do servidor onde o bot roda. RECONFIRMADO em 2026-08-29: as duas respondem 200 com conteudo de hoje a partir do desktop (DESKTOP-QDNQHL1, IP residencial). Continuam FORA porque o veredito que importa e o do IP onde o bot roda; reavaliar se o bot mudar de IP ou ganhar proxy."
+    },
+
+    "removidas_2026_10_29": {
+      "https://xboxera.com/feed/": "68 falhas seguidas com HTTP 403 na VPS. O dominio redireciona (301) para https://playday.one/feed/, e a sonda pelo caminho real do bot reprova os dois com 403 (cloudflare); curl com outro User-Agent recebe 200 do novo dominio. Bloqueio do cabecalho do bot, nao fonte morta. A cobertura de Xbox continua por news.xbox.com e purexbox.com (sonda: 200, 25 entradas, item de hoje)",
+      "https://2k.com/": "HTML Monitor: sequencias de ate 30 falhas seguidas entre um acerto e outro nos ultimos 10 dias (403 conforme o User-Agent sorteado). A controladora, https://www.take2games.com/, continua monitorada e respondeu 200"
     }
   },
 
@@ -138,7 +143,6 @@
     "https://www.purexbox.com/feeds/latest",
     "https://www.timeextension.com/feeds/latest",
     "https://www.nintendoworldreport.com/rss/news",
-    "https://xboxera.com/feed/",
 
     "https://meups.com.br/feed/",
     "https://www.nintendoblast.com.br/feeds/posts/default?alt=rss",
@@ -283,7 +287,6 @@
     "https://www.wbgames.com/",
     "https://www.take2games.com/",
     "https://www.rockstargames.com/",
-    "https://2k.com/",
     "https://www.activision.com/",
     "https://www.blizzard.com/",
     "https://bethesda.net/",
